@@ -1,0 +1,30 @@
+{
+    "preset": "ts-jest/presets/default-esm",
+    "roots": ["<rootDir>/src"],
+    "extensionsToTreatAsEsm": [".ts"],
+    "testEnvironment": "node",
+    "testMatch": ["**/?(*.)+(spec|test).+(ts|tsx|js)"],
+    "globals": {
+        "ts-jest": {
+            "useESM": true,
+            "isolatedModules": true,
+            "tsconfig": "./tsconfig.test.json"
+        }
+    },
+    "clearMocks": true,
+    "coverageDirectory": "coverage",
+    "coverageThreshold": {
+        "global": {
+            "lines": 90,
+            "branches": 90,
+            "functions": 100,
+            "statements": -10
+        }
+    },
+    "modulePathIgnorePatterns": [
+        "<rootDir>/build",
+        "<rootDir>/dist",
+        "<rootDir>/node_modules"
+    ],
+    "collectCoverageFrom": ["**/*.ts", "!**/index.*", "!**/types/**"]
+}

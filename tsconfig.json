@@ -1,0 +1,28 @@
+{
+    "ts-node": {
+        "esm": true,
+        "files": true
+    },
+    "compilerOptions": {
+        "target": "esnext",
+        "module": "esnext",
+        "resolveJsonModule": true,
+        "moduleResolution": "node",
+        "rootDir": "./",
+        "declaration": false,
+        "declarationMap": false,
+        "sourceMap": false,
+        "outDir": "dist",
+        "removeComments": false,
+        "strict": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "noImplicitThis": true,
+        "alwaysStrict": true,
+        "typeRoots": ["./node_modules/@types", "./types"],
+        "esModuleInterop": true,
+        "newLine": "lf"
+    },
+    "exclude": ["node_modules", "dist", "lib", ".husky", "coverage", "target"]
+}

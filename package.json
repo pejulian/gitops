@@ -1,0 +1,96 @@
+{
+    "name": "git-toolkit",
+    "description": "Swiss army knife for doing all sorts of cool stuff on your Git setup",
+    "type": "module",
+    "author": "Julian Pereira",
+    "license": "ISC",
+    "version": "0.0.0-beta.0",
+    "engines": {
+        "node": ">=16",
+        "npm": ">=8"
+    },
+    "bin": {
+        "git-toolkit": "./dist/index.js"
+    },
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "keywords": [
+        "typescript",
+        "toolkit",
+        "git",
+        "octokit",
+        "devops",
+        "sysadmin"
+    ],
+    "scripts": {
+        "build": "node --max-old-space-size=4096 --no-warnings --experimental-specifier-resolution=node --experimental-modules --loader ts-node/esm ./node_modules/.bin/webpack-cli --config ./webpack.config.ts",
+        "prepublishOnly": "npm run build",
+        "test": "jest --config ./jest.config.json --runInBand --no-cache",
+        "test:watch": "jest --config ./jest.config.json --watch",
+        "test:coverage": "jest --config ./jest.config.json --no-cache --runInBand --collectCoverage",
+        "prettier:format": "prettier --write ./src/**/*.ts",
+        "prettier:check": "prettier --list-different ./src/**/*.ts",
+        "lint": "eslint --fix",
+        "prepare": "husky install",
+        "publish:latest": "npm publish --tag latest",
+        "publish:beta": "npm publish --tag beta",
+        "versions:list": "npm view c9-js-logger --json"
+    },
+    "lint-staged": {
+        "*.{ts,js}": [
+            "npm run lint"
+        ],
+        "*.{json,md,html,ts,js}": [
+            "npm run prettier:format"
+        ]
+    },
+    "repository": {
+        "type": "git",
+        "url": "git@github.topdanmark.local:ln0/git-toolkit.git"
+    },
+    "bugs": {
+        "url": "https://github.topdanmark.local/ln0/git-toolkit/issues"
+    },
+    "publishConfig": {
+        "registry": "http://artifactory.topdanmark.local/artifactory/api/npm/npm-local"
+    },
+    "devDependencies": {
+        "@types/fs-extra": "^9.0.13",
+        "@types/jest": "^28.1.4",
+        "@types/lodash": "^4.14.182",
+        "@types/node": "^18.0.3",
+        "@types/prompt": "^1.1.2",
+        "@typescript-eslint/eslint-plugin": "^5.30.5",
+        "@typescript-eslint/parser": "^5.30.5",
+        "eslint": "^8.19.0",
+        "eslint-config-prettier": "^8.5.0",
+        "eslint-plugin-prettier": "^4.2.1",
+        "husky": "^8.0.1",
+        "jest": "^28.1.2",
+        "jest-mock": "^28.1.1",
+        "lint-staged": "^13.0.3",
+        "prettier": "^2.7.1",
+        "terser-webpack-plugin": "^5.3.3",
+        "ts-jest": "^28.0.5",
+        "ts-node": "^10.8.2",
+        "typescript": "^4.7.4",
+        "webpack": "^5.73.0",
+        "webpack-cli": "^4.10.0"
+    },
+    "dependencies": {
+        "@octokit/rest": "^18.12.0",
+        "chalk": "^5.0.1",
+        "commander": "^9.3.0",
+        "fs-extra": "^10.1.0",
+        "lodash": "^4.17.21",
+        "prompt": "^1.3.0",
+        "semver": "^7.3.7"
+    }
+}

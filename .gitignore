@@ -1,0 +1,16 @@
+aws-sso.ps1
+node_modules
+*.iml
+.idea
+coverage
+tests/coverage/
+dist/
+lib/
+os-toolkit-*.tgz
+junit.xml
+.vscode/
+.tmp-workspace-*
+__output__/
+.reports
+target/*
+.scannerwork/*
