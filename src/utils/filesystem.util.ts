@@ -193,7 +193,7 @@ export class FilesystemUtils {
         } catch (e) {
             this.logger.error(
                 `[${FilesystemUtils.CLASS_NAME}.writeFile]`,
-                `Failed to create directory ${name}`,
+                `Failed to create directory ${name}\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message

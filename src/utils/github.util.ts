@@ -585,7 +585,7 @@ export class GithubUtils {
 
         this.logger.debug(
             `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
-            `Uploading the following files`,
+            `Uploading the following files\n`,
             JSON.stringify(pathsForBlobs, undefined, 4)
         );
 
@@ -599,7 +599,7 @@ export class GithubUtils {
 
         this.logger.debug(
             `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
-            `New tree created`,
+            `New tree created\n`,
             JSON.stringify(newTree, undefined, 4)
         );
 
@@ -612,7 +612,7 @@ export class GithubUtils {
 
         this.logger.debug(
             `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
-            `New commit created by ${newCommit.author.name} <${newCommit.author.email}>`,
+            `New commit created by ${newCommit.author.name} <${newCommit.author.email}>\n`,
             JSON.stringify(newCommit, undefined, 4)
         );
 
@@ -624,7 +624,7 @@ export class GithubUtils {
 
         this.logger.debug(
             `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
-            `New commit pushed to ${ref} by ${newCommit.author.name} <${newCommit.author.email}>`,
+            `New commit pushed to ${ref} by ${newCommit.author.name} <${newCommit.author.email}>\n`,
             JSON.stringify(commitBranchResponse, undefined, 4)
         );
     }
