@@ -28,7 +28,8 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
         super({
             githubToken: options.githubToken,
             logLevel: LogLevel[options.logLevel as keyof typeof LogLevel],
-            tokenFilePath: options.tokenFilePath
+            tokenFilePath: options.tokenFilePath,
+            command: RenameFileAction.CLASS_NAME
         });
 
         this.organizations = options.organizations;

@@ -23,6 +23,10 @@ export type GenericActionOptions = Readonly<{
      * NOTE: The file must reside in the root or subdirectory OF THE USERS HOME DIRECTORY
      */
     tokenFilePath?: string;
+    /**
+     * The command that this tool was invoked with
+     */
+    command: string;
 }>;
 
 export abstract class GenericAction<T> implements IGenericAction<T> {
@@ -33,7 +37,7 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
     constructor(options: GenericActionOptions) {
         const logLevel = options.logLevel ?? LogLevel.ERROR;
 
-        this.logger = new LoggerUtil(logLevel);
+        this.logger = new LoggerUtil(logLevel, options.command);
 
         this.filesystemUtils = new FilesystemUtils({
             logger: this.logger
