@@ -2,24 +2,20 @@ import os from 'os';
 import _ from 'lodash';
 
 import { Octokit, RestEndpointMethodTypes } from '@octokit/rest';
-import { components } from '@octokit/openapi-types';
+import { operations, components } from '@octokit/openapi-types';
 
 import { Agent } from 'https';
 import { FilesystemUtils } from './filesystem.util';
 import { LoggerUtil, LogLevel } from './logger.util';
 
-export type OrganizationRepository = Readonly<{
-    name: string;
-    fullName: string;
-    archived: boolean;
-    disabled: boolean;
-    fork: boolean;
-    ownerName?: string | null;
-    repositoryUrl: string;
-}>;
+export type GitHubRepository = components['schemas']['minimal-repository'];
 
-export type RepositoryTree = Tree;
 export type RespositoryFile = FileItem;
+
+export type GitTreeWithFileDescriptor = Readonly<{
+    tree: GitTree;
+    descriptor: GitTreeItem;
+}>;
 
 export type GetBlobOptions = Readonly<{
     encoding?: BufferEncoding;
@@ -37,15 +33,27 @@ export type GetContentOptions = Readonly<{
 type DirectoryListing = components['schemas']['content-directory'];
 type FileItem = components['schemas']['content-file'];
 type BlobItem = components['schemas']['blob'];
-type GitReference = components['schemas']['git-ref'];
-type Commit = components['schemas']['git-commit'];
-type Tree = components['schemas']['git-tree'];
+
+export type GitReference = components['schemas']['git-ref'];
+export type GitTree = components['schemas']['git-tree'];
+export type GitTreeItem = UnpackedArray<
+    components['schemas']['git-tree']['tree']
+>;
+export type GitCommit = components['schemas']['git-commit'];
+export type ShortBlob = components['schemas']['short-blob'];
+export type GitCreateCommitResponse = components['schemas']['git-commit'];
 
 export type GithubUtilsOptions = Readonly<{
     githubToken?: string;
     tokenFilePath?: string;
     baseDir?: string;
     logger: LoggerUtil;
+    filesystemUtils: FilesystemUtils;
+}>;
+
+export type CurrentCommitSha = Readonly<{
+    commitSha: string;
+    treeSha: string;
 }>;
 
 export class GithubUtils {
@@ -63,9 +71,7 @@ export class GithubUtils {
     constructor(options: GithubUtilsOptions) {
         this.logger = options.logger;
 
-        this.filesystemUtils = new FilesystemUtils({
-            logger: this.logger
-        });
+        this.filesystemUtils = options.filesystemUtils;
 
         this.baseDir = options?.baseDir;
 
@@ -103,8 +109,8 @@ export class GithubUtils {
             includeArchived: false,
             includeDisabled: false
         }
-    ): Promise<Array<OrganizationRepository>> {
-        const repositories: Array<OrganizationRepository> = [];
+    ): Promise<Array<GitHubRepository>> {
+        const repositories: Array<GitHubRepository> = [];
 
         try {
             for await (const response of this.octokit.paginate.iterator(
@@ -127,15 +133,7 @@ export class GithubUtils {
                             }
                         }
 
-                        repositories.push({
-                            name: repository.name,
-                            fullName: repository.full_name,
-                            archived: repository.archived ? true : false,
-                            disabled: repository.disabled ? true : false,
-                            fork: repository.fork,
-                            ownerName: repository.owner.login,
-                            repositoryUrl: repository.html_url
-                        });
+                        repositories.push(repository);
                     }
                 });
             }
@@ -156,26 +154,25 @@ export class GithubUtils {
     /**
      * Gets the root tree for the given repository
      * @param repository The repository name
-     * @param owner The owner of the repository
      * @param ref The reference to search for. Must be formated as "heads/branch_name" for branches or "tags/tag_name" for tags
+     * @param recursive Should all subtree's be returned as well
      */
-    public async getRepositoryTree(
-        repository: string,
-        owner: string,
-        ref = 'heads/master'
-    ): Promise<RepositoryTree> {
+    public async getRepositoryGitTree(
+        repository: GitHubRepository,
+        ref = 'heads/master',
+        recursive?: boolean
+    ): Promise<GitTree> {
         try {
-            const reference = await this.getReference(repository, owner, ref);
+            const reference = await this.getReference(repository, ref);
 
             if (!reference) {
                 throw new Error(
-                    `No reference found for ref ${ref} in ${owner}/${repository}`
+                    `No reference found in ${repository.full_name}: <${ref}>`
                 );
             }
 
             const commit = await this.getCommit(
                 repository,
-                owner,
                 reference.object.sha
             );
 
@@ -185,13 +182,17 @@ export class GithubUtils {
                 );
             }
 
-            const tree = await this.getTree(repository, owner, commit.tree.sha);
+            const tree = await this.getTree(
+                repository,
+                commit.tree.sha,
+                recursive
+            );
 
             return tree;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.getRepositoryTree]`,
-                `Could not get repository tree with ref ${ref} for ${owner}/${repository}`,
+                `[${GithubUtils.CLASS_NAME}.getRepositoryGitTree]`,
+                `Could not get repository tree with ref ${ref} for ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -204,14 +205,12 @@ export class GithubUtils {
     /**
      * Gets all release tags for this repository.
      *
-     * @param organization The Git organization where repositories will be searched for
      * @param repository The repository name
      * @param options
      * @returns
      */
     public async listReleaseTags(
-        organization: string,
-        repository: string,
+        repository: GitHubRepository,
         options?: Pick<
             RestEndpointMethodTypes['repos']['listReleases']['parameters'],
             'per_page' | 'page'
@@ -223,8 +222,8 @@ export class GithubUtils {
             for await (const response of this.octokit.paginate.iterator(
                 this.octokit.rest.repos.listReleases,
                 {
-                    owner: organization,
-                    repo: repository,
+                    owner: repository.owner.login,
+                    repo: repository.name,
                     ...(options && options)
                 }
             )) {
@@ -237,7 +236,7 @@ export class GithubUtils {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtils.CLASS_NAME}.listReleaseTags]`,
-                `Could not list release tags for ${organization}/${repository}`,
+                `Could not list release tags for ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -250,29 +249,23 @@ export class GithubUtils {
     /**
      * Gets the last release tag.
      *
-     * @param organization The Git organization where repositories will be searched for
-     * @param repository The repository name
+     * @param repository The repository
      * @returns
      */
     public async listLastReleaseTag(
-        organization: string,
-        repository: string
+        repository: GitHubRepository
     ): Promise<string | undefined> {
         try {
-            const tags: Array<string> = await this.listReleaseTags(
-                organization,
-                repository,
-                {
-                    page: 1,
-                    per_page: 1
-                }
-            );
+            const tags: Array<string> = await this.listReleaseTags(repository, {
+                page: 1,
+                per_page: 1
+            });
 
             return tags.length > 0 ? tags[0] : undefined;
         } catch (e) {
             this.logger.error(
                 `[${GithubUtils.CLASS_NAME}.listLastReleaseTag]`,
-                `Could not list the last release tag for ${organization}/${repository}`,
+                `Could not list the last release tag for ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -285,17 +278,14 @@ export class GithubUtils {
     /**
      * Gets the last 50 release tags.
      *
-     * @param organization The Git organization where repositories will be searched for
-     * @param repository The repository name
+     * @param repository The repository
      * @returns
      */
     public async listLast50ReleaseTags(
-        organization: string,
-        repository: string
+        repository: GitHubRepository
     ): Promise<Array<string>> {
         try {
             const tagNames: Array<string> = await this.listReleaseTags(
-                organization,
                 repository,
                 {
                     page: 1,
@@ -307,7 +297,7 @@ export class GithubUtils {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtils.CLASS_NAME}.listLast50ReleaseTags]`,
-                `Could not list the last 50 release tags for ${organization}/${repository}`,
+                `Could not list the last 50 release tags for ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -319,21 +309,25 @@ export class GithubUtils {
 
     /**
      * Obtains the tree details based on the given tree SHA.
-     * @param repository The repository name
-     * @param owner The owner of the repository
+     * @param repository The repository
      * @param tree_sha The tree SHA obtained from the {@linkcode GithubUtils.getCommit} function
+     * @param recursive should all subtrees be returned when getting the specified tree
      * @returns
      */
     public async getTree(
-        repository: string,
-        owner: string,
-        tree_sha: string
-    ): Promise<Tree> {
+        repository: GitHubRepository,
+        tree_sha: string,
+        recursive?: boolean
+    ): Promise<GitTree> {
         try {
             const result = await this.octokit.git.getTree({
-                owner,
-                repo: repository,
-                tree_sha
+                owner: repository.owner.login,
+                repo: repository.name,
+                tree_sha,
+                recursive:
+                    typeof recursive === 'boolean' && recursive
+                        ? '1'
+                        : undefined
             });
 
             if (result.status !== 200) {
@@ -346,7 +340,7 @@ export class GithubUtils {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtils.CLASS_NAME}.getTree]`,
-                `Could not obtain tree "${tree_sha}" from ${owner}/${repository}`,
+                `Could not obtain tree "${tree_sha}" from ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -355,38 +349,89 @@ export class GithubUtils {
         }
     }
 
-    // public async createTree(repository: string, owner: string, baseTree: Tree) {
-    //     try {
-    //         await this.octokit.git.createTree({
-    //             owner,
-    //             repo: repository,
-    //             base_tree: baseTree.sha
-    //         });
-    //     } catch (e) {}
-    // }
+    /**
+     *
+     * @param repository The repository to operatate on
+     * @param blobs An array of blobs containing new files to be created in the new tree
+     * @param paths An array of paths representing how these blobs (files) will be located in the tree
+     * @param tree The tree where new blobs will be appended to
+     * @param parentTreeSha The parent tree
+     * @returns
+     */
+    public async createNewTree(
+        repository: GitHubRepository,
+        blobs: Array<ShortBlob>,
+        paths: Array<string>,
+        tree?: GitTree,
+        parentTreeSha?: string
+    ): Promise<GitTree> {
+        type CreateTree = UnpackedArray<
+            operations['git/create-tree']['requestBody']['content']['application/json']['tree']
+        >;
+
+        const mappedBlobs: Array<CreateTree> = blobs.map(({ sha }, index) => {
+            return {
+                mode: '100644',
+                type: 'blob',
+                path: paths[index],
+                sha
+            } as CreateTree;
+        });
+
+        const response = await this.octokit.git.createTree({
+            owner: repository.owner.login,
+            repo: repository.name,
+            base_tree: tree ? undefined : parentTreeSha,
+            tree: tree
+                ? [
+                      ...(tree.tree as unknown as Array<CreateTree>),
+                      ...mappedBlobs
+                  ]
+                : mappedBlobs
+        });
+
+        return response.data;
+    }
+
+    /**
+     * Gets the latest commit for the given ref
+     * An optional tree SHA can be supplied. If available, the latest commit will be fetched from this tree instead.
+     */
+    public async getCurrentCommit(
+        repository: GitHubRepository,
+        ref = 'heads/master'
+    ): Promise<CurrentCommitSha> {
+        const { object: refObject } = await this.getReference(repository, ref);
+        const sha = refObject.sha;
+
+        const commit = await this.getCommit(repository, sha);
+
+        return {
+            commitSha: sha,
+            treeSha: commit.tree.sha
+        };
+    }
 
     /**
      * Obtains the commit details based on the given commit SHA.
-     * @param repository The repository name
-     * @param owner The owner of the repository
+     * @param repository The repository
      * @param commit_sha The commit SHA obtained from the {@linkcode GithubUtils.getReference} function
      * @returns
      */
     public async getCommit(
-        repository: string,
-        owner: string,
+        repository: GitHubRepository,
         commit_sha: string
-    ): Promise<Commit> {
+    ): Promise<GitCommit> {
         try {
             const result = await this.octokit.git.getCommit({
-                owner,
-                repo: repository,
+                owner: repository.owner.login,
+                repo: repository.name,
                 commit_sha
             });
 
             if (result.status !== 200) {
                 throw new Error(
-                    `Non successful status code while getting "${commit_sha}" - ${result.status}`
+                    `Non successful status code (${result.status}) while getting "${commit_sha}"`
                 );
             }
 
@@ -394,7 +439,7 @@ export class GithubUtils {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtils.CLASS_NAME}.getCommit]`,
-                `Could not obtain commit "${commit_sha}" from ${owner}/${repository}`,
+                `Could not obtain commit "${commit_sha}" from ${repository.full_name}\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -404,14 +449,193 @@ export class GithubUtils {
     }
 
     /**
+     * Creates a commit to the given tree
+     * @param repository
+     * @param commitMessage
+     * @param treeSHA
+     * @returns
+     */
+    public async createCommit(
+        repository: GitHubRepository,
+        commitMessage: string,
+        treeSHA: string,
+        commitSHA: string
+    ) {
+        try {
+            const result = await this.octokit.git.createCommit({
+                owner: repository.owner.login,
+                repo: repository.name,
+                message: commitMessage,
+                tree: treeSHA,
+                parents: [commitSHA]
+            });
+
+            return result.data;
+        } catch (e) {
+            this.logger.error(
+                `[${GithubUtils.CLASS_NAME}.createCommit]`,
+                `Failed to create a new commit for ${repository.full_name} with the given tree SHA ${treeSHA} and commit SHA ${commitSHA}\n`,
+                this.logger.logLevel === LogLevel.DEBUG
+                    ? e
+                    : (e as Error).message
+            );
+            throw e;
+        }
+    }
+
+    public async createBlobForFile(
+        repository: GitHubRepository,
+        filePath: string,
+        encoding: 'utf-8' | 'base64' = 'utf-8'
+    ): Promise<ShortBlob> {
+        try {
+            const content = this.filesystemUtils.readFile(filePath, encoding);
+
+            if (!content) {
+                throw new Error(
+                    `The file at path ${filePath} has no readable content`
+                );
+            }
+
+            const response = await this.octokit.git.createBlob({
+                owner: repository.owner.login,
+                repo: repository.name,
+                content,
+                encoding
+            });
+
+            return response.data;
+        } catch (e) {
+            this.logger.error(
+                `[${GithubUtils.CLASS_NAME}.createBlobForFile]`,
+                this.logger.logLevel === LogLevel.DEBUG
+                    ? e
+                    : (e as Error).message
+            );
+            throw e;
+        }
+    }
+
+    /**
+     * A multi purpose uploader function.
+     *
+     * Can upload at a sub-directory level (create a tree that is relative to a parent tree). Good for adding and modfying files
+     * or
+     * Upload at the root tree (make commits like renaming and deleting file)
+     *
+     * To upload at the root tree, provide a composite object containing a file descriptor and the tree it belongs to for further processing.
+     *
+     * @param uploadDirPath
+     * @param repository
+     * @param commitMessage
+     * @param ref
+     * @param fileDescriptorWithTree An object containing the file descriptor and git tree it belongs to
+     */
+    public async uploadToRepository(
+        uploadDirPath: string,
+        repository: GitHubRepository,
+        commitMessage: string,
+        ref = 'heads/master',
+        fileDescriptorWithTree?: GitTreeWithFileDescriptor
+    ) {
+        this.logger.debug(
+            `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
+            `Uploading to ${repository.full_name} <${ref}> from ${uploadDirPath}`
+        );
+
+        // https://stackoverflow.com/questions/31563444/rename-a-file-with-github-api
+        // https://levibotelho.com/development/commit-a-file-with-the-github-api
+        let modifiedDescriptorWithTree: GitTreeWithFileDescriptor | undefined;
+        if (fileDescriptorWithTree) {
+            modifiedDescriptorWithTree = {
+                ...fileDescriptorWithTree,
+                tree: {
+                    ...fileDescriptorWithTree.tree,
+                    tree: _.filter(
+                        fileDescriptorWithTree.tree.tree,
+                        (treeItem) => {
+                            return treeItem.type !== 'tree';
+                        }
+                    )
+                }
+            };
+        }
+
+        const currentCommit: CurrentCommitSha = await this.getCurrentCommit(
+            repository,
+            ref
+        );
+
+        const filePaths = await this.filesystemUtils.createGlobFromPath(
+            uploadDirPath
+        );
+
+        const fileBlobs = await Promise.all(
+            filePaths.map((filePath) =>
+                this.createBlobForFile(repository, filePath)
+            )
+        );
+
+        const pathsForBlobs = filePaths.map((filePath) => {
+            return this.filesystemUtils.createRelativePath(
+                uploadDirPath,
+                filePath
+            );
+        });
+
+        this.logger.debug(
+            `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
+            `Uploading the following files`,
+            JSON.stringify(pathsForBlobs, undefined, 4)
+        );
+
+        const newTree = await this.createNewTree(
+            repository,
+            fileBlobs,
+            pathsForBlobs,
+            modifiedDescriptorWithTree?.tree,
+            currentCommit.treeSha
+        );
+
+        this.logger.debug(
+            `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
+            `New tree created`,
+            JSON.stringify(newTree, undefined, 4)
+        );
+
+        const newCommit = await this.createCommit(
+            repository,
+            commitMessage,
+            newTree.sha,
+            currentCommit.commitSha
+        );
+
+        this.logger.debug(
+            `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
+            `New commit created by ${newCommit.author.name} <${newCommit.author.email}>`,
+            JSON.stringify(newCommit, undefined, 4)
+        );
+
+        const commitBranchResponse = await this.setCommmitBranch(
+            repository,
+            ref,
+            newCommit.sha
+        );
+
+        this.logger.debug(
+            `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
+            `New commit pushed to ${ref} by ${newCommit.author.name} <${newCommit.author.email}>`,
+            JSON.stringify(commitBranchResponse, undefined, 4)
+        );
+    }
+
+    /**
      * Gets referrence details for the given repository
-     * @param repository The repository name
-     * @param owner The owner of the repository
+     * @param repository The repository
      * @param reference The reference to search for. Must be formated as "heads/branch_name" for branches or "tags/tag_name" for tags
      */
     public async getReference(
-        repository: string,
-        owner: string,
+        repository: GitHubRepository,
         reference: string
     ): Promise<GitReference> {
         if (!reference.match(/^(heads|tags)\/\S+$/g)) {
@@ -425,8 +649,8 @@ export class GithubUtils {
 
         try {
             const result = await this.octokit.git.getRef({
-                owner,
-                repo: repository,
+                owner: repository.owner.login,
+                repo: repository.name,
                 ref: reference
             });
 
@@ -440,7 +664,7 @@ export class GithubUtils {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtils.CLASS_NAME}.getReference]`,
-                `Could not obtain reference "${reference}" from ${owner}/${repository}`,
+                `Could not obtain reference "${reference}" from ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -456,9 +680,9 @@ export class GithubUtils {
      * @returns
      */
     public static getFileDescriptorFromTree(
-        repositoryTree: RepositoryTree,
+        repositoryTree: GitTree,
         name: string
-    ): UnpackedArray<RepositoryTree['tree']> | undefined {
+    ): GitTreeItem | undefined {
         const { tree } = repositoryTree;
 
         const match = tree.find((item) => {
@@ -475,9 +699,7 @@ export class GithubUtils {
      * @param repositoryTree The tree to filter
      * @returns
      */
-    public static getFilePathsFromTree(
-        repositoryTree: RepositoryTree
-    ): Array<string> {
+    public static getFilePathsFromTree(repositoryTree: GitTree): Array<string> {
         const { tree } = repositoryTree;
         const filePaths: Array<string> = [];
 
@@ -496,7 +718,7 @@ export class GithubUtils {
      * @returns
      */
     public static getSubfoldersFromTree(
-        repositoryTree: RepositoryTree
+        repositoryTree: GitTree
     ): Array<string> {
         const { tree } = repositoryTree;
         const subfolders: Array<string> = [];
@@ -511,6 +733,50 @@ export class GithubUtils {
     }
 
     /**
+     * Obtains the file content as a string based on its size.
+     *
+     * @param repository The repository where the file is in
+     * @param fileDescriptor The descriptor for the file
+     * @param filePath The relative file path to this repo
+     * @param options Additional options for fetching the file
+     * @returns
+     */
+    public async getFileDescriptorContent(
+        repository: GitHubRepository,
+        filePath: string,
+        fileDescriptor: GitTreeItem,
+        options?: GetContentOptions | GetBlobOptions
+    ) {
+        if (!repository.owner.login) {
+            throw new Error(`The repository provided does not have a name`);
+        }
+
+        let fileContent: string;
+
+        const size = GithubUtils.bytesToSize(fileDescriptor.size);
+
+        if (size.measure === 'MB' && size.value > 1 && fileDescriptor.sha) {
+            fileContent = await this.getBlob(
+                repository,
+                fileDescriptor.sha,
+                options
+            );
+        } else {
+            fileContent = await this.getContent(
+                repository,
+                filePath.startsWith('./')
+                    ? filePath.replace('./', '')
+                    : filePath.startsWith('/')
+                    ? filePath.replace('/', '')
+                    : filePath,
+                options
+            );
+        }
+
+        return fileContent;
+    }
+
+    /**
      * Gets raw file content at the specified path from the repository.
      * Supports files up to 1MB in size
      * @param owner
@@ -520,23 +786,22 @@ export class GithubUtils {
      * @returns
      */
     public async getContent(
-        owner: string,
-        repository: string,
+        repository: GitHubRepository,
         path: string,
         options?: GetContentOptions
     ): Promise<string> {
         try {
             const response = await this.octokit.repos.getContent({
                 path,
-                repo: repository,
-                owner,
+                repo: repository.name,
+                owner: repository.owner.login,
                 ref: options?.ref
             });
 
             if (response.status !== 200) {
                 this.logger.error(
                     `[${GithubUtils.CLASS_NAME}.getContent]`,
-                    `Expected read fail ${path} in ${repository} ref:${options?.ref}`
+                    `Read fail ${path} in ${repository.full_name} <${options?.ref}>`
                 );
 
                 throw new Error(
@@ -550,14 +815,14 @@ export class GithubUtils {
 
             this.logger.debug(
                 `[${GithubUtils.CLASS_NAME}.getContent]`,
-                `Read ${path} in ${repository} ref:${options?.ref}`
+                `Read ${path} in ${repository} <${options?.ref}>`
             );
 
             return fileContent;
         } catch (e) {
             this.logger.error(
                 `[${GithubUtils.CLASS_NAME}.getContent]`,
-                `${path} does not exist/cannot be read in ${repository}`,
+                `${path} does not exist/cannot be read in ${repository.full_name}\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -569,15 +834,13 @@ export class GithubUtils {
 
     /**
      *
-     * @param owner
      * @param repository
      * @param path
      * @param options
      * @returns
      */
     public async listDirectoryFilesInRepo(
-        owner: string,
-        repository: string,
+        repository: GitHubRepository,
         path: string
     ): Promise<Array<FileItem>> {
         const directoryListing: Array<FileItem> = [];
@@ -585,8 +848,8 @@ export class GithubUtils {
         try {
             const response = await this.octokit.repos.getContent({
                 path,
-                repo: repository,
-                owner
+                owner: repository.owner.login,
+                repo: repository.name
             });
 
             if (response.status !== 200) {
@@ -601,7 +864,7 @@ export class GithubUtils {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtils.CLASS_NAME}.listDirectoryFilesInRepo]`,
-                `${path} does not exist/cannot be read in ${repository}`,
+                `${path} does not exist/cannot be read in ${repository.full_name}\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -613,20 +876,18 @@ export class GithubUtils {
 
     /**
      *
-     * @param owner
      * @param repository
      * @param file_sha
      */
     public async getBlob(
-        owner: string,
-        repository: string,
+        repository: GitHubRepository,
         file_sha: string,
         options?: GetBlobOptions
     ): Promise<string> {
         try {
             const response = await this.octokit.git.getBlob({
-                repo: repository,
-                owner,
+                owner: repository.owner.login,
+                repo: repository.name,
                 file_sha
             });
 
@@ -643,7 +904,7 @@ export class GithubUtils {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtils.CLASS_NAME}.getBlob]`,
-                `${file_sha} cannot be read in ${owner}/${repository}`,
+                `${file_sha} cannot be read in ${repository.full_name}\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -657,96 +918,52 @@ export class GithubUtils {
      * @param repository The repository where the file path will be searched
      * @param filePath The file path to search for (e.g. /etc/v1/foo.json, ./eslintrc, ./src/v1/utils/path.ts)
      * @param ref The git ref (e.g. heads/master)
+     * @param recursive Should the search be done for all sub trees of the repositories trees.
      * @returns
      */
     public async findTreeAndDescriptorForFilePath(
-        repository: OrganizationRepository,
+        repository: GitHubRepository,
         filePath: string,
-        ref: string
-    ): Promise<
-        | {
-              tree: RepositoryTree;
-              descriptor: UnpackedArray<RepositoryTree['tree']>;
-          }
-        | undefined
-    > {
+        ref: string,
+        recursive?: boolean
+    ): Promise<GitTreeWithFileDescriptor | undefined> {
         try {
-            if (!repository.ownerName) {
+            if (!repository.owner.login) {
                 throw new Error(
                     `The repository ${repository.name} does not have an owner!`
                 );
             }
 
-            const repositoryTree = await this.getRepositoryTree(
-                repository.name,
-                repository.ownerName,
-                ref
+            const repositoryTree = await this.getRepositoryGitTree(
+                repository,
+                ref,
+                recursive
             );
 
-            const pathParts = filePath.split('/');
-            const [fileName, ...directoryPaths] = pathParts.reverse();
-            if (directoryPaths[directoryPaths.length - 1] === '.') {
-                directoryPaths.pop();
+            const fileName = FilesystemUtils.getFileNameFromPath(filePath);
+
+            const { tree } = repositoryTree;
+
+            const fileDescriptor = this.findMatchingDescriptor(
+                tree,
+                'blob',
+                fileName
+            );
+
+            if (!fileDescriptor) {
+                throw new Error(
+                    `No such file ${fileName} found at the root of ${repository.full_name}`
+                );
             }
-            const isFileAtRoot = directoryPaths.length === 0;
-            const { tree: rootTree } = repositoryTree;
 
-            if (isFileAtRoot) {
-                const fileDescriptor = this.findMatchingDescriptor(
-                    rootTree,
-                    'blob',
-                    fileName
-                );
-
-                if (!fileDescriptor) {
-                    throw new Error(
-                        `No such file ${fileName} found at the root of ${repository.ownerName}/${repository.name}`
-                    );
-                }
-
-                return {
-                    tree: repositoryTree,
-                    descriptor: fileDescriptor
-                };
-            } else {
-                const matchedTree = await this.findMatchingTreeRecursively(
-                    repository,
-                    repositoryTree,
-                    _.filter(
-                        directoryPaths.reverse(),
-                        (value) => typeof value === 'string' && value.length > 0
-                    )
-                );
-
-                if (!matchedTree) {
-                    throw new Error(
-                        `No such file ${fileName} found at the root of ${repository.ownerName}/${repository.name}`
-                    );
-                }
-
-                const fileDescriptor = this.findMatchingDescriptor(
-                    matchedTree.tree,
-                    'blob',
-                    fileName
-                );
-
-                if (!fileDescriptor) {
-                    throw new Error(
-                        `No such file ${fileName} found at given path /${directoryPaths
-                            .reverse()
-                            .join('/')}`
-                    );
-                }
-
-                return {
-                    tree: matchedTree,
-                    descriptor: fileDescriptor
-                };
-            }
+            return {
+                tree: repositoryTree,
+                descriptor: fileDescriptor
+            };
         } catch (e) {
             this.logger.warn(
-                `[${GithubUtils.CLASS_NAME}]`,
-                `Skipping ${repository.ownerName}/${repository.name} due to an error`,
+                `[${GithubUtils.CLASS_NAME}].findTreeAndDescriptorForFilePath`,
+                `Skipping ${repository.full_name} due to an error\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -756,64 +973,38 @@ export class GithubUtils {
         }
     }
 
-    public async findMatchingTreeRecursively(
-        repository: OrganizationRepository,
-        treeToSearch: RepositoryTree,
-        directoryPaths: Array<string>
-    ): Promise<RepositoryTree | undefined> {
-        if (!repository.ownerName) {
-            throw new Error(
-                `The repository ${repository.name} does not have an owner!`
-            );
-        }
+    public async setCommmitBranch(
+        repository: GitHubRepository,
+        ref = 'heads/master',
+        commitSha: string
+    ): Promise<GitReference> {
+        try {
+            const response = await this.octokit.git.updateRef({
+                owner: repository.owner.login,
+                repo: repository.name,
+                ref,
+                sha: commitSha
+            });
 
-        const treeItem = this.findMatchingDescriptor(
-            treeToSearch.tree,
-            'tree',
-            directoryPaths[0]
-        );
-
-        if (!treeItem) {
-            throw new Error(
-                `The path ${directoryPaths[0]} does not exist in ${repository.ownerName}/${repository.name}`
-            );
-        }
-
-        if (treeItem.type === 'tree') {
-            if (!treeItem?.sha) {
-                throw new Error(
-                    `The tree item for ${directoryPaths[0]} does not have a usable SHA`
-                );
-            }
-
-            directoryPaths.shift(); // Remove the first item from the array
-
-            // Get the tree for this subdirectory
-            const subTree = await this.getTree(
-                repository.name,
-                repository.ownerName,
-                treeItem.sha
+            return response.data;
+        } catch (e) {
+            this.logger.warn(
+                `[${GithubUtils.CLASS_NAME}].setCommmitBranch`,
+                `Failed to set commit branch for ${repository.full_name} <${ref}>\n`,
+                this.logger.logLevel === LogLevel.DEBUG
+                    ? e
+                    : (e as Error).message
             );
 
-            // If there's nothing else to search, then return the tree at this point
-            if (directoryPaths.length === 0) {
-                return subTree;
-            }
-
-            // Search the subdirectory tree
-            return await this.findMatchingTreeRecursively(
-                repository,
-                subTree,
-                directoryPaths
-            );
+            throw e;
         }
     }
 
     public findMatchingDescriptor(
-        treeToSearch: RepositoryTree['tree'],
+        treeToSearch: GitTree['tree'],
         typeToSearchFor: 'blob' | 'tree',
         descriptorToMatch: string
-    ): UnpackedArray<RepositoryTree['tree']> | undefined {
+    ): GitTreeItem | undefined {
         const match = _.chain(treeToSearch)
             .filter(({ type }) => {
                 return type === typeToSearchFor;
@@ -862,45 +1053,3 @@ export class GithubUtils {
         };
     }
 }
-
-// const utils = new GithubUtils();
-// utils
-//     .getReference('top-context', 'c9', 'heads/master')
-//     .then(async (reference) => {
-//         // console.log(reference);
-
-//         if (reference) {
-//             const commit = await utils.getCommit(
-//                 'top-context',
-//                 'c9',
-//                 reference?.object.sha
-//             );
-
-//             // console.log(commit);
-
-//             if (commit) {
-//                 const tree = await utils.getTree(
-//                     'top-context',
-//                     'c9',
-//                     commit?.tree.sha
-//                 );
-
-//                 const item = tree?.tree.find(
-//                     (item) => item.path === 'package-lock.json'
-//                 );
-
-//                 console.log(item);
-
-//                 if (item) {
-//                     const packageLock = await utils.getBlob(
-//                         'c9',
-//                         'top-context',
-//                         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-//                         item.sha!
-//                     );
-
-//                     // console.log(packageLock);
-//                 }
-//             }
-//         }
-//     });

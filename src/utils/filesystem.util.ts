@@ -1,8 +1,9 @@
 import { WriteFileOptions, realpathSync } from 'fs';
-import { join, dirname } from 'path';
+import { relative, dirname, join } from 'path';
 import fse from 'fs-extra';
-import { LoggerUtil } from './logger.util';
+import { LoggerUtil, LogLevel } from './logger.util';
 import { fileURLToPath } from 'url';
+import { globby } from 'globby';
 
 const __filename = fileURLToPath(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -12,8 +13,13 @@ export type FilesystemUtilsOptions = Readonly<{
     logger: LoggerUtil;
 }>;
 
+export type FilesystemWriteFileOptions = WriteFileOptions;
+
 export class FilesystemUtils {
     private static readonly CLASS_NAME = 'FilesystemUtils';
+
+    public static readonly TMP_DIR = '.tmp';
+
     private readonly logger: LoggerUtil;
 
     constructor(options: FilesystemUtilsOptions) {
@@ -38,7 +44,9 @@ export class FilesystemUtils {
             this.logger.error(
                 `[${FilesystemUtils.CLASS_NAME}.readFile]`,
                 `Failed to read file at ${filePath}`,
-                e
+                this.logger.logLevel === LogLevel.DEBUG
+                    ? e
+                    : (e as Error).message
             );
             return undefined;
         }
@@ -70,7 +78,9 @@ export class FilesystemUtils {
             this.logger.error(
                 `[${FilesystemUtils.CLASS_NAME}.writeJsonFile]`,
                 `Failed to write JSON file to ${filePath}`,
-                e
+                this.logger.logLevel === LogLevel.DEBUG
+                    ? e
+                    : (e as Error).message
             );
         }
     }
@@ -101,7 +111,9 @@ export class FilesystemUtils {
             this.logger.error(
                 `[${FilesystemUtils.CLASS_NAME}.writeFile]`,
                 `Failed to write file to ${filePath}`,
-                e
+                this.logger.logLevel === LogLevel.DEBUG
+                    ? e
+                    : (e as Error).message
             );
             return undefined;
         }
@@ -167,13 +179,26 @@ export class FilesystemUtils {
         return rootDir;
     }
 
-    public createDirectory(name: string): string | undefined {
+    /**
+     * Creates a sub-directory at the root folder of this project.
+     * @param name The name of the subdirectory to create
+     * @returns
+     */
+    public createSubdirectoryAtProjectRoot(
+        name: string = FilesystemUtils.TMP_DIR
+    ): string {
         try {
             const path = `${this.getRootDir()}${name}`;
             return this.createFolder(path);
         } catch (e) {
-            this.logger.error(`Failed to create directory ${name}`, e);
-            return undefined;
+            this.logger.error(
+                `[${FilesystemUtils.CLASS_NAME}.writeFile]`,
+                `Failed to create directory ${name}`,
+                this.logger.logLevel === LogLevel.DEBUG
+                    ? e
+                    : (e as Error).message
+            );
+            throw e;
         }
     }
 
@@ -193,26 +218,27 @@ export class FilesystemUtils {
             return false;
         }
     }
+
+    public async createGlobFromPath(path: string): Promise<Array<string>> {
+        return await globby(path);
+    }
+
+    public createRelativePath(rootPath: string, filePath: string): string {
+        return relative(rootPath, filePath);
+    }
+
+    public static getFileNameFromPath(filePath: string): string {
+        const pathParts = filePath.split('/');
+        const [fileName] = pathParts.reverse();
+        return fileName;
+    }
+
+    public static getDirectoryPartsFromPath(filePath: string): Array<string> {
+        const pathParts = filePath.split('/');
+        const [, ...directoryPaths] = pathParts.reverse();
+        if (directoryPaths[directoryPaths.length - 1] === '.') {
+            directoryPaths.pop();
+        }
+        return directoryPaths;
+    }
 }
-
-// console.log(new FilesystemUtils().createDirectory('.tmp'));
-
-// console.log(git statu
-//     new FilesystemUtils().parseTopdanmarkInfrastructureConfigFile(
-//         `export PARAMETERS="\
-// Version=2.0.1 \
-// AppName=c9-session-service \
-// BasePath=session \
-// LogLevel=info \
-// DynatraceEnable=false \
-// DynatraceLayerArn=DYNATRACE_LAYER_ARN \
-// DynatraceEnvironmentId=DYNATRACE_ENVIRONMENT_ID \
-// DynatraceClusterId=DYNATRACE_CLUSTER_ID \
-// DynatraceAuthToken=DYNATRACE_AUTH_TOKEN \
-// EnableProvisionedConcurrency=false \
-// ProvisionedConcurrentExecutions=0 \
-// wso2Environment=dscm289,dscm673
-// "`,
-//         'conf'
-//     )
-// );

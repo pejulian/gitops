@@ -1,3 +1,4 @@
+import { FilesystemUtils } from '../utils/filesystem.util';
 import { GithubUtils } from '../utils/github.util';
 import { LoggerUtil, LogLevel } from '../utils/logger.util';
 
@@ -27,17 +28,22 @@ export type GenericActionOptions = Readonly<{
 export abstract class GenericAction<T> implements IGenericAction<T> {
     protected readonly logger: LoggerUtil;
     protected readonly githubUtils: GithubUtils;
-
-    private readonly logLevel: LogLevel;
+    protected readonly filesystemUtils: FilesystemUtils;
 
     constructor(options: GenericActionOptions) {
-        this.logLevel = options.logLevel ?? LogLevel.ERROR;
-        this.logger = new LoggerUtil(this.logLevel);
+        const logLevel = options.logLevel ?? LogLevel.ERROR;
+
+        this.logger = new LoggerUtil(logLevel);
+
+        this.filesystemUtils = new FilesystemUtils({
+            logger: this.logger
+        });
 
         this.githubUtils = new GithubUtils({
             githubToken: options.githubToken,
             tokenFilePath: options.tokenFilePath,
-            logger: this.logger
+            logger: this.logger,
+            filesystemUtils: this.filesystemUtils
         });
     }
 
