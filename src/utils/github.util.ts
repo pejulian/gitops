@@ -981,19 +981,17 @@ export class GithubUtil {
             );
 
             for (const filePath of filePaths) {
-                const fileName = FilesystemUtil.getFileNameFromPath(filePath);
-
                 const { tree } = repositoryTree;
 
                 const fileDescriptor = this.findMatchingDescriptor(
                     tree,
                     'blob',
-                    fileName
+                    filePath
                 );
 
                 if (!fileDescriptor) {
                     throw new Error(
-                        `No such file ${fileName} found at the root of ${repository.full_name}`
+                        `No such file ${filePath} found at the root of ${repository.full_name}`
                     );
                 }
 
@@ -1007,7 +1005,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.warn(
                 `[${GithubUtil.CLASS_NAME}.findTreeAndDescriptorForFilePath]`,
-                `Skipping ${repository.full_name} due to an error\n`,
+                `Skipping ${repository.full_name} due to an issue\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -1049,13 +1047,26 @@ export class GithubUtil {
         typeToSearchFor: 'blob' | 'tree',
         descriptorToMatch: string
     ): GitTreeItem | undefined {
+        this.logger.info(
+            `[${GithubUtil.CLASS_NAME}.findMatchingDescriptor]`,
+            `Checking tree for descriptor paths matching ${descriptorToMatch}`
+        );
+
         const match = _.chain(treeToSearch)
             .filter(({ type }) => {
                 return type === typeToSearchFor;
             })
             .find(({ path }) => {
                 if (path) {
-                    return path.includes(descriptorToMatch);
+                    if (path === descriptorToMatch) {
+                        this.logger.debug(
+                            `[${GithubUtil.CLASS_NAME}.findMatchingDescriptor]`,
+                            `Found descriptor path ${path} that matches user supplied path ${descriptorToMatch}`
+                        );
+                        return true;
+                    }
+
+                    return false;
                 }
                 return false;
             })
