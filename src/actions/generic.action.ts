@@ -1,6 +1,8 @@
-import { FilesystemUtils } from '../utils/filesystem.util';
-import { GithubUtils } from '../utils/github.util';
+import { FilesystemUtil } from '../utils/filesystem.util';
+import { GithubUtil } from '../utils/github.util';
 import { LoggerUtil, LogLevel } from '../utils/logger.util';
+import { NpmUtil } from '../utils/npm.util';
+import { ProcessorUtil } from '../utils/processsor.util';
 
 export interface IGenericAction<T> {
     run(): Promise<T>;
@@ -31,23 +33,34 @@ export type GenericActionOptions = Readonly<{
 
 export abstract class GenericAction<T> implements IGenericAction<T> {
     protected readonly logger: LoggerUtil;
-    protected readonly githubUtils: GithubUtils;
-    protected readonly filesystemUtils: FilesystemUtils;
+    protected readonly githubUtil: GithubUtil;
+    protected readonly filesystemUtil: FilesystemUtil;
+    protected readonly processorUtil: ProcessorUtil;
+    protected readonly npmUtil: NpmUtil;
 
     constructor(options: GenericActionOptions) {
         const logLevel = options.logLevel ?? LogLevel.ERROR;
 
         this.logger = new LoggerUtil(logLevel, options.command);
 
-        this.filesystemUtils = new FilesystemUtils({
+        this.processorUtil = new ProcessorUtil({
             logger: this.logger
         });
 
-        this.githubUtils = new GithubUtils({
+        this.npmUtil = new NpmUtil({
+            logger: this.logger,
+            processorUtil: this.processorUtil
+        });
+
+        this.filesystemUtil = new FilesystemUtil({
+            logger: this.logger
+        });
+
+        this.githubUtil = new GithubUtil({
             githubToken: options.githubToken,
             tokenFilePath: options.tokenFilePath,
             logger: this.logger,
-            filesystemUtils: this.filesystemUtils
+            filesystemUtils: this.filesystemUtil
         });
     }
 

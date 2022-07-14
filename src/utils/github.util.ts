@@ -5,7 +5,7 @@ import { Octokit, RestEndpointMethodTypes } from '@octokit/rest';
 import { operations, components } from '@octokit/openapi-types';
 
 import { Agent } from 'https';
-import { FilesystemUtils } from './filesystem.util';
+import { FilesystemUtil, GlobOptions } from './filesystem.util';
 import { LoggerUtil, LogLevel } from './logger.util';
 
 export type GitHubRepository = components['schemas']['minimal-repository'];
@@ -14,7 +14,7 @@ export type RespositoryFile = FileItem;
 
 export type GitTreeWithFileDescriptor = Readonly<{
     tree: GitTree;
-    descriptor: GitTreeItem;
+    descriptors: Array<GitTreeItem>;
 }>;
 
 export type GetBlobOptions = Readonly<{
@@ -48,7 +48,7 @@ export type GithubUtilsOptions = Readonly<{
     tokenFilePath?: string;
     baseDir?: string;
     logger: LoggerUtil;
-    filesystemUtils: FilesystemUtils;
+    filesystemUtils: FilesystemUtil;
 }>;
 
 export type CurrentCommitSha = Readonly<{
@@ -56,8 +56,8 @@ export type CurrentCommitSha = Readonly<{
     treeSha: string;
 }>;
 
-export class GithubUtils {
-    private static readonly CLASS_NAME = 'GithubUtils';
+export class GithubUtil {
+    private static readonly CLASS_NAME = 'GithubUtil';
 
     public static GITHUB_TOKEN_PATH = 'c9-cli-token.txt';
     public static GITHUB_API_BASE_PATH =
@@ -66,24 +66,24 @@ export class GithubUtils {
     private readonly baseDir: string | undefined;
     private readonly octokit: Octokit;
     private readonly logger: LoggerUtil;
-    private readonly filesystemUtils: FilesystemUtils;
+    private readonly filesystemUtil: FilesystemUtil;
 
     constructor(options: GithubUtilsOptions) {
         this.logger = options.logger;
 
-        this.filesystemUtils = options.filesystemUtils;
+        this.filesystemUtil = options.filesystemUtils;
 
         this.baseDir = options?.baseDir;
 
         this.octokit = new Octokit({
             auth:
                 options?.githubToken ??
-                this.filesystemUtils.readFile(
+                this.filesystemUtil.readFile(
                     `${os.homedir()}/${
-                        options?.tokenFilePath ?? GithubUtils.GITHUB_TOKEN_PATH
+                        options?.tokenFilePath ?? GithubUtil.GITHUB_TOKEN_PATH
                     }`
                 ),
-            baseUrl: GithubUtils.GITHUB_API_BASE_PATH,
+            baseUrl: GithubUtil.GITHUB_API_BASE_PATH,
             request: { agent: new Agent({ rejectUnauthorized: false }) }
         });
     }
@@ -140,7 +140,7 @@ export class GithubUtils {
             return repositories;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.listRepositoriesForOrganization]`,
+                `[${GithubUtil.CLASS_NAME}.listRepositoriesForOrganization]`,
                 `Could not list repositories for ${organization}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -191,7 +191,7 @@ export class GithubUtils {
             return tree;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.getRepositoryGitTree]`,
+                `[${GithubUtil.CLASS_NAME}.getRepositoryGitTree]`,
                 `Could not get repository tree with ref ${ref} for ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -235,7 +235,7 @@ export class GithubUtils {
             return tags;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.listReleaseTags]`,
+                `[${GithubUtil.CLASS_NAME}.listReleaseTags]`,
                 `Could not list release tags for ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -264,7 +264,7 @@ export class GithubUtils {
             return tags.length > 0 ? tags[0] : undefined;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.listLastReleaseTag]`,
+                `[${GithubUtil.CLASS_NAME}.listLastReleaseTag]`,
                 `Could not list the last release tag for ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -296,7 +296,7 @@ export class GithubUtils {
             return tagNames;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.listLast50ReleaseTags]`,
+                `[${GithubUtil.CLASS_NAME}.listLast50ReleaseTags]`,
                 `Could not list the last 50 release tags for ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -310,7 +310,7 @@ export class GithubUtils {
     /**
      * Obtains the tree details based on the given tree SHA.
      * @param repository The repository
-     * @param tree_sha The tree SHA obtained from the {@linkcode GithubUtils.getCommit} function
+     * @param tree_sha The tree SHA obtained from the {@linkcode GithubUtil.getCommit} function
      * @param recursive should all subtrees be returned when getting the specified tree
      * @returns
      */
@@ -339,7 +339,7 @@ export class GithubUtils {
             return result.data;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.getTree]`,
+                `[${GithubUtil.CLASS_NAME}.getTree]`,
                 `Could not obtain tree "${tree_sha}" from ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -356,6 +356,7 @@ export class GithubUtils {
      * @param paths An array of paths representing how these blobs (files) will be located in the tree
      * @param tree The tree where new blobs will be appended to
      * @param parentTreeSha The parent tree
+     * @param options Additional options to consider when creating the new tree
      * @returns
      */
     public async createNewTree(
@@ -363,16 +364,28 @@ export class GithubUtils {
         blobs: Array<ShortBlob>,
         paths: Array<string>,
         tree?: GitTree,
-        parentTreeSha?: string
+        parentTreeSha?: string,
+        options?: Readonly<{
+            referenceDescriptors?: Array<GitTreeItem>;
+        }>
     ): Promise<GitTree> {
         type CreateTree = UnpackedArray<
             operations['git/create-tree']['requestBody']['content']['application/json']['tree']
         >;
 
         const mappedBlobs: Array<CreateTree> = blobs.map(({ sha }, index) => {
+            // Try to find the tree item for the blob that is being mapped in reference descriptors if provided
+            const descriptor = _.find(
+                options?.referenceDescriptors,
+                (descriptor) =>
+                    descriptor.path
+                        ? descriptor.path?.includes(paths[index])
+                        : false
+            );
+
             return {
-                mode: '100644',
-                type: 'blob',
+                mode: descriptor?.mode ?? '100644',
+                type: descriptor?.type ?? 'blob',
                 path: paths[index],
                 sha
             } as CreateTree;
@@ -415,7 +428,7 @@ export class GithubUtils {
     /**
      * Obtains the commit details based on the given commit SHA.
      * @param repository The repository
-     * @param commit_sha The commit SHA obtained from the {@linkcode GithubUtils.getReference} function
+     * @param commit_sha The commit SHA obtained from the {@linkcode GithubUtil.getReference} function
      * @returns
      */
     public async getCommit(
@@ -438,7 +451,7 @@ export class GithubUtils {
             return result.data;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.getCommit]`,
+                `[${GithubUtil.CLASS_NAME}.getCommit]`,
                 `Could not obtain commit "${commit_sha}" from ${repository.full_name}\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -473,7 +486,7 @@ export class GithubUtils {
             return result.data;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.createCommit]`,
+                `[${GithubUtil.CLASS_NAME}.createCommit]`,
                 `Failed to create a new commit for ${repository.full_name} with the given tree SHA ${treeSHA} and commit SHA ${commitSHA}\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -489,7 +502,7 @@ export class GithubUtils {
         encoding: 'utf-8' | 'base64' = 'utf-8'
     ): Promise<ShortBlob> {
         try {
-            const content = this.filesystemUtils.readFile(filePath, encoding);
+            const content = this.filesystemUtil.readFile(filePath, encoding);
 
             if (!content) {
                 throw new Error(
@@ -507,7 +520,7 @@ export class GithubUtils {
             return response.data;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.createBlobForFile]`,
+                `[${GithubUtil.CLASS_NAME}.createBlobForFile]`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
                     : (e as Error).message
@@ -527,26 +540,36 @@ export class GithubUtils {
      *
      * @param uploadDirPath
      * @param repository
-     * @param commitMessage
+     * @param commitMessage A message for this commit
      * @param ref
      * @param fileDescriptorWithTree An object containing the file descriptor and git tree it belongs to
+     * @param options Additional options for the upload process
      */
     public async uploadToRepository(
         uploadDirPath: string,
         repository: GitHubRepository,
         commitMessage: string,
         ref = 'heads/master',
-        fileDescriptorWithTree?: GitTreeWithFileDescriptor
+        fileDescriptorWithTree?: GitTreeWithFileDescriptor,
+        options: Readonly<{
+            removeSubtrees: boolean;
+            globOptions?: GlobOptions;
+        }> = {
+            /**
+             * Should be set to false if the fileDescriptorWithTree contains a tree that was NOT fetched recursively
+             */
+            removeSubtrees: true
+        }
     ) {
         this.logger.debug(
-            `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
+            `[${GithubUtil.CLASS_NAME}.uploadToRepository]`,
             `Uploading to ${repository.full_name} <${ref}> from ${uploadDirPath}`
         );
 
         // https://stackoverflow.com/questions/31563444/rename-a-file-with-github-api
         // https://levibotelho.com/development/commit-a-file-with-the-github-api
         let modifiedDescriptorWithTree: GitTreeWithFileDescriptor | undefined;
-        if (fileDescriptorWithTree) {
+        if (fileDescriptorWithTree && options?.removeSubtrees) {
             modifiedDescriptorWithTree = {
                 ...fileDescriptorWithTree,
                 tree: {
@@ -566,8 +589,9 @@ export class GithubUtils {
             ref
         );
 
-        const filePaths = await this.filesystemUtils.createGlobFromPath(
-            uploadDirPath
+        const filePaths = await this.filesystemUtil.createGlobFromPath(
+            uploadDirPath,
+            options.globOptions
         );
 
         const fileBlobs = await Promise.all(
@@ -577,16 +601,19 @@ export class GithubUtils {
         );
 
         const pathsForBlobs = filePaths.map((filePath) => {
-            return this.filesystemUtils.createRelativePath(
+            return this.filesystemUtil.createRelativePath(
                 uploadDirPath,
                 filePath
             );
         });
 
         this.logger.debug(
-            `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
-            `Uploading the following files\n`,
-            JSON.stringify(pathsForBlobs, undefined, 4)
+            `[${GithubUtil.CLASS_NAME}.uploadToRepository]`,
+            `Uploading the following files\n${pathsForBlobs
+                .map((path, index) => {
+                    return `[${index + 1}] ${path}`;
+                })
+                .join('\n')}`
         );
 
         const newTree = await this.createNewTree(
@@ -594,11 +621,14 @@ export class GithubUtils {
             fileBlobs,
             pathsForBlobs,
             modifiedDescriptorWithTree?.tree,
-            currentCommit.treeSha
+            currentCommit.treeSha,
+            {
+                referenceDescriptors: fileDescriptorWithTree?.descriptors
+            }
         );
 
         this.logger.debug(
-            `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
+            `[${GithubUtil.CLASS_NAME}.uploadToRepository]`,
             `New tree created\n`,
             JSON.stringify(newTree, undefined, 4)
         );
@@ -611,7 +641,7 @@ export class GithubUtils {
         );
 
         this.logger.debug(
-            `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
+            `[${GithubUtil.CLASS_NAME}.uploadToRepository]`,
             `New commit created by ${newCommit.author.name} <${newCommit.author.email}>\n`,
             JSON.stringify(newCommit, undefined, 4)
         );
@@ -623,7 +653,7 @@ export class GithubUtils {
         );
 
         this.logger.debug(
-            `[${GithubUtils.CLASS_NAME}.uploadToRepository]`,
+            `[${GithubUtil.CLASS_NAME}.uploadToRepository]`,
             `New commit pushed to ${ref} by ${newCommit.author.name} <${newCommit.author.email}>\n`,
             JSON.stringify(commitBranchResponse, undefined, 4)
         );
@@ -640,7 +670,7 @@ export class GithubUtils {
     ): Promise<GitReference> {
         if (!reference.match(/^(heads|tags)\/\S+$/g)) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.getReference]`,
+                `[${GithubUtil.CLASS_NAME}.getReference]`,
                 `The given reference "${reference}" does not have the correct format of either "heads/<branch_name>" or "tags/<tag_name>"`
             );
 
@@ -663,7 +693,7 @@ export class GithubUtils {
             return result.data;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.getReference]`,
+                `[${GithubUtil.CLASS_NAME}.getReference]`,
                 `Could not obtain reference "${reference}" from ${repository.full_name}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -737,15 +767,16 @@ export class GithubUtils {
      *
      * @param repository The repository where the file is in
      * @param fileDescriptor The descriptor for the file
-     * @param filePath The relative file path to this repo
      * @param options Additional options for fetching the file
      * @returns
      */
     public async getFileDescriptorContent(
         repository: GitHubRepository,
-        filePath: string,
         fileDescriptor: GitTreeItem,
-        options?: GetContentOptions | GetBlobOptions
+        options: GetContentOptions | GetBlobOptions = {
+            ref: 'heads/master',
+            encoding: 'utf-8'
+        }
     ) {
         if (!repository.owner.login) {
             throw new Error(`The repository provided does not have a name`);
@@ -753,7 +784,8 @@ export class GithubUtils {
 
         let fileContent: string;
 
-        const size = GithubUtils.bytesToSize(fileDescriptor.size);
+        const size = GithubUtil.bytesToSize(fileDescriptor.size);
+        const { path: filePath } = fileDescriptor;
 
         if (size.measure === 'MB' && size.value > 1 && fileDescriptor.sha) {
             fileContent = await this.getBlob(
@@ -762,6 +794,12 @@ export class GithubUtils {
                 options
             );
         } else {
+            if (!filePath) {
+                throw new Error(
+                    `The file descriptor did not contain a usable path`
+                );
+            }
+
             fileContent = await this.getContent(
                 repository,
                 filePath.startsWith('./')
@@ -800,7 +838,7 @@ export class GithubUtils {
 
             if (response.status !== 200) {
                 this.logger.error(
-                    `[${GithubUtils.CLASS_NAME}.getContent]`,
+                    `[${GithubUtil.CLASS_NAME}.getContent]`,
                     `Read fail ${path} in ${repository.full_name} <${options?.ref}>`
                 );
 
@@ -814,14 +852,14 @@ export class GithubUtils {
             const fileContent = buffer.toString(options?.encoding ?? 'utf8');
 
             this.logger.debug(
-                `[${GithubUtils.CLASS_NAME}.getContent]`,
-                `Read ${path} in ${repository} <${options?.ref}>`
+                `[${GithubUtil.CLASS_NAME}.getContent]`,
+                `Read ${path} in ${repository.full_name} <${options?.ref}>`
             );
 
             return fileContent;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.getContent]`,
+                `[${GithubUtil.CLASS_NAME}.getContent]`,
                 `${path} does not exist/cannot be read in ${repository.full_name}\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -863,7 +901,7 @@ export class GithubUtils {
             });
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.listDirectoryFilesInRepo]`,
+                `[${GithubUtil.CLASS_NAME}.listDirectoryFilesInRepo]`,
                 `${path} does not exist/cannot be read in ${repository.full_name}\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -875,7 +913,7 @@ export class GithubUtils {
     }
 
     /**
-     *
+     * Gets content as blob from the repository
      * @param repository
      * @param file_sha
      */
@@ -903,7 +941,7 @@ export class GithubUtils {
             return fileContent;
         } catch (e) {
             this.logger.error(
-                `[${GithubUtils.CLASS_NAME}.getBlob]`,
+                `[${GithubUtil.CLASS_NAME}.getBlob]`,
                 `${file_sha} cannot be read in ${repository.full_name}\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -914,19 +952,21 @@ export class GithubUtils {
     }
 
     /**
-     * Search the given repository for a file path on the specified ref
+     * Search the given repository for a list of file path on the specified ref
      * @param repository The repository where the file path will be searched
-     * @param filePath The file path to search for (e.g. /etc/v1/foo.json, ./eslintrc, ./src/v1/utils/path.ts)
+     * @param filePaths A list of file paths to search for (e.g. /etc/v1/foo.json, ./eslintrc, ./src/v1/utils/path.ts)
      * @param ref The git ref (e.g. heads/master)
      * @param recursive Should the search be done for all sub trees of the repositories trees.
      * @returns
      */
     public async findTreeAndDescriptorForFilePath(
         repository: GitHubRepository,
-        filePath: string,
-        ref: string,
+        filePaths: Array<string>,
+        ref = 'heads/master',
         recursive?: boolean
     ): Promise<GitTreeWithFileDescriptor | undefined> {
+        const fileDescriptors: Array<GitTreeItem> = [];
+
         try {
             if (!repository.owner.login) {
                 throw new Error(
@@ -940,29 +980,33 @@ export class GithubUtils {
                 recursive
             );
 
-            const fileName = FilesystemUtils.getFileNameFromPath(filePath);
+            for (const filePath of filePaths) {
+                const fileName = FilesystemUtil.getFileNameFromPath(filePath);
 
-            const { tree } = repositoryTree;
+                const { tree } = repositoryTree;
 
-            const fileDescriptor = this.findMatchingDescriptor(
-                tree,
-                'blob',
-                fileName
-            );
-
-            if (!fileDescriptor) {
-                throw new Error(
-                    `No such file ${fileName} found at the root of ${repository.full_name}`
+                const fileDescriptor = this.findMatchingDescriptor(
+                    tree,
+                    'blob',
+                    fileName
                 );
+
+                if (!fileDescriptor) {
+                    throw new Error(
+                        `No such file ${fileName} found at the root of ${repository.full_name}`
+                    );
+                }
+
+                fileDescriptors.push(fileDescriptor);
             }
 
             return {
                 tree: repositoryTree,
-                descriptor: fileDescriptor
+                descriptors: fileDescriptors
             };
         } catch (e) {
             this.logger.warn(
-                `[${GithubUtils.CLASS_NAME}].findTreeAndDescriptorForFilePath`,
+                `[${GithubUtil.CLASS_NAME}.findTreeAndDescriptorForFilePath]`,
                 `Skipping ${repository.full_name} due to an error\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -989,7 +1033,7 @@ export class GithubUtils {
             return response.data;
         } catch (e) {
             this.logger.warn(
-                `[${GithubUtils.CLASS_NAME}].setCommmitBranch`,
+                `[${GithubUtil.CLASS_NAME}.setCommmitBranch]`,
                 `Failed to set commit branch for ${repository.full_name} <${ref}>\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e

@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import { GitToolkitCommands } from '../index';
 import {
-    FilesystemUtils,
+    FilesystemUtil,
     FilesystemWriteFileOptions
 } from '../utils/filesystem.util';
 import {
@@ -22,7 +22,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
     private repositories: string | undefined;
     private targetFilePath: string;
     private newFileName: string;
-    private gitRef: string;
+    private gitRef: string | undefined;
 
     constructor(options: RenameFileActionOptions) {
         super({
@@ -41,7 +41,12 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
 
     public async run(): Promise<void> {
         this.logger.info(
-            `[${RenameFileAction.CLASS_NAME}]`,
+            `[${RenameFileAction.CLASS_NAME}.run]`,
+            `Renaming ${this.targetFilePath} to ${this.newFileName} in ${this.organizations.length} organization(s)`
+        );
+
+        this.logger.debug(
+            `[${RenameFileAction.CLASS_NAME}.run]`,
             `Git organizations to work on are:\n${this.organizations
                 .map((organization, index) => {
                     return `[${index + 1}] ${organization}\n`;
@@ -54,23 +59,37 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
 
         for (const repository of repositories) {
             const descriptorWithTree =
-                await this.githubUtils.findTreeAndDescriptorForFilePath(
+                await this.githubUtil.findTreeAndDescriptorForFilePath(
                     repository,
-                    this.targetFilePath,
-                    this.gitRef,
+                    [this.targetFilePath],
+                    this.gitRef ?? `heads/${repository.default_branch}`,
                     true
                 );
 
-            if (!descriptorWithTree?.descriptor) {
+            if (!descriptorWithTree?.descriptors?.[0]) {
                 this.logger.warn(
-                    `[${RenameFileAction.CLASS_NAME}]`,
-                    `The target file path ${this.targetFilePath} was not found in ${repository.full_name} with ref ${this.gitRef}`
+                    `[${RenameFileAction.CLASS_NAME}.run]`,
+                    `The target file path ${
+                        this.targetFilePath
+                    } was not found in ${repository.full_name} <${
+                        this.gitRef ?? `heads/${repository.default_branch}`
+                    }>`
                 );
+
                 continue;
             }
 
             await this.writeFileWithNewName(repository, descriptorWithTree);
         }
+
+        this.logger.info(
+            `[${RenameFileAction.CLASS_NAME}.run]`,
+            `Operation completed.\n`,
+            `View full output log at ${
+                this.logger.getLogFilePaths().outputLog
+            }\n`,
+            `View full error log at ${this.logger.getLogFilePaths().errorLog}`
+        );
     }
 
     /**
@@ -84,20 +103,22 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
 
         for (const organization of this.organizations) {
             const repositories =
-                await this.githubUtils.listRepositoriesForOrganization(
+                await this.githubUtil.listRepositoriesForOrganization(
                     organization,
                     {
                         onlyInclude: this.repositories
                     }
                 );
 
-            this.logger.info(
-                `[${RenameFileAction.CLASS_NAME}].listApplicableRepositoriesForOperation`,
+            this.logger.debug(
+                `[${RenameFileAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
                 `Matched ${
                     repositories.length
                 } repositories for ${organization}:\n${repositories
-                    .map((respository, index) => {
-                        return `[${index + 1}] ${respository.name}\n`;
+                    .map((repository, index) => {
+                        return `[${index + 1}] ${repository.name} [${
+                            this.gitRef ?? `heads/${repository.default_branch}`
+                        }]\n`;
                     })
                     .join('')}\n`
             );
@@ -113,12 +134,11 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
         descriptorWithTree: GitTreeWithFileDescriptor,
         options?: FilesystemWriteFileOptions
     ) {
-        const fileContent = await this.githubUtils.getFileDescriptorContent(
+        const fileContent = await this.githubUtil.getFileDescriptorContent(
             repository,
-            this.targetFilePath,
-            descriptorWithTree?.descriptor,
+            descriptorWithTree?.descriptors?.[0],
             {
-                ref: this.gitRef
+                ref: this.gitRef ?? `heads/${repository.default_branch}`
             }
         );
 
@@ -130,39 +150,40 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                 tree: _(descriptorWithTree.tree.tree)
                     .filter((treeItem) => {
                         return (
-                            treeItem.sha !== descriptorWithTree.descriptor.sha
+                            treeItem.sha !==
+                            descriptorWithTree.descriptors?.[0].sha
                         );
                     })
                     .value()
             }
         };
 
-        const tmpDir = this.filesystemUtils.createSubdirectoryAtProjectRoot();
+        const tmpDir = this.filesystemUtil.createSubdirectoryAtProjectRoot();
 
-        const directoryPaths = FilesystemUtils.getDirectoryPartsFromPath(
+        const directoryPaths = FilesystemUtil.getDirectoryPartsFromPath(
             this.targetFilePath
         );
 
         let pathInConstruction = tmpDir;
         directoryPaths.forEach((directoryPath) => {
             pathInConstruction = `${tmpDir}/${directoryPath}`;
-            this.filesystemUtils.createFolder(pathInConstruction);
+            this.filesystemUtil.createFolder(pathInConstruction);
         });
 
-        this.filesystemUtils.writeFile(
+        this.filesystemUtil.writeFile(
             `${pathInConstruction}/${this.newFileName}`,
             fileContent,
             options
         );
 
-        await this.githubUtils.uploadToRepository(
+        await this.githubUtil.uploadToRepository(
             tmpDir,
             repository,
             `Rename ${this.targetFilePath} to ${this.newFileName}`,
-            this.gitRef,
+            this.gitRef ?? `heads/${repository.default_branch}`,
             modifiedDescriptorWithTree
         );
 
-        this.filesystemUtils.removeDirectory(tmpDir);
+        this.filesystemUtil.removeDirectory(tmpDir);
     }
 }

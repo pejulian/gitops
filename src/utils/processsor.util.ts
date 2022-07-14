@@ -6,6 +6,8 @@ export type ProcessorUtilOptions = Readonly<{
 }>;
 
 export class ProcessorUtil {
+    private static readonly CLASS_NAME = 'ProcessorUtil';
+
     private readonly logger: LoggerUtil;
 
     constructor(options: ProcessorUtilOptions) {
@@ -20,12 +22,15 @@ export class ProcessorUtil {
         Readonly<{
             response: string;
             code: number | null;
+            command: string;
         }>
     > {
         return new Promise((resolve) => {
             this.logger.info(
-                `[ProcessorUtil.spawnProcess]`,
-                `Running command: "${command} ${args.join(' ')}"`
+                `[${ProcessorUtil.CLASS_NAME}.spawnProcess]`,
+                `Running command: "${command} ${args.join(' ')}"${
+                    options?.cwd ? ` [${options.cwd}]` : ''
+                }`
             );
 
             const chunks: Array<string> = [];
@@ -49,7 +54,8 @@ export class ProcessorUtil {
             process.on('close', function (code) {
                 resolve({
                     response: chunks.join(''),
-                    code
+                    code,
+                    command: [command, ...args].join(' ')
                 });
             });
         });

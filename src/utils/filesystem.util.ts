@@ -3,7 +3,7 @@ import { relative, dirname, join } from 'path';
 import fse from 'fs-extra';
 import { LoggerUtil, LogLevel } from './logger.util';
 import { fileURLToPath } from 'url';
-import { globby } from 'globby';
+import { globby, Options as GlobbyOptions } from 'globby';
 
 const __filename = fileURLToPath(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -15,8 +15,10 @@ export type FilesystemUtilsOptions = Readonly<{
 
 export type FilesystemWriteFileOptions = WriteFileOptions;
 
-export class FilesystemUtils {
-    private static readonly CLASS_NAME = 'FilesystemUtils';
+export type GlobOptions = GlobbyOptions;
+
+export class FilesystemUtil {
+    private static readonly CLASS_NAME = 'FilesystemUtil';
 
     public static readonly TMP_DIR = '.tmp';
 
@@ -42,7 +44,7 @@ export class FilesystemUtils {
             });
         } catch (e) {
             this.logger.error(
-                `[${FilesystemUtils.CLASS_NAME}.readFile]`,
+                `[${FilesystemUtil.CLASS_NAME}.readFile]`,
                 `Failed to read file at ${filePath}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -57,7 +59,7 @@ export class FilesystemUtils {
      *
      * @example
      * ```typescript
-     * (await new FilesystemUtils()).writeJsonFile(
+     * (await new FilesystemUtil()).writeJsonFile(
      *     (await import('path')).join(__dirname, '/c9Repositories.json'),
      *      response.data
      * );
@@ -76,7 +78,7 @@ export class FilesystemUtils {
             await fse.writeJson(filePath, content, options);
         } catch (e) {
             this.logger.error(
-                `[${FilesystemUtils.CLASS_NAME}.writeJsonFile]`,
+                `[${FilesystemUtil.CLASS_NAME}.writeJsonFile]`,
                 `Failed to write JSON file to ${filePath}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -90,7 +92,7 @@ export class FilesystemUtils {
      *
      * @example
      * ```typescript
-     * FilesystemUtils.writeFile(
+     * FilesystemUtil.writeFile(
      *     (await import('path')).join(__dirname, '/myFile.json'),
      *      response.data
      * );
@@ -109,7 +111,7 @@ export class FilesystemUtils {
             fse.writeFileSync(filePath, content, options);
         } catch (e) {
             this.logger.error(
-                `[${FilesystemUtils.CLASS_NAME}.writeFile]`,
+                `[${FilesystemUtil.CLASS_NAME}.writeFile]`,
                 `Failed to write file to ${filePath}`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -185,14 +187,14 @@ export class FilesystemUtils {
      * @returns
      */
     public createSubdirectoryAtProjectRoot(
-        name: string = FilesystemUtils.TMP_DIR
+        name: string = FilesystemUtil.TMP_DIR
     ): string {
         try {
             const path = `${this.getRootDir()}${name}`;
             return this.createFolder(path);
         } catch (e) {
             this.logger.error(
-                `[${FilesystemUtils.CLASS_NAME}.writeFile]`,
+                `[${FilesystemUtil.CLASS_NAME}.writeFile]`,
                 `Failed to create directory ${name}\n`,
                 this.logger.logLevel === LogLevel.DEBUG
                     ? e
@@ -219,8 +221,11 @@ export class FilesystemUtils {
         }
     }
 
-    public async createGlobFromPath(path: string): Promise<Array<string>> {
-        return await globby(path);
+    public async createGlobFromPath(
+        path: string,
+        options?: GlobbyOptions
+    ): Promise<Array<string>> {
+        return await globby(path, options);
     }
 
     public createRelativePath(rootPath: string, filePath: string): string {
