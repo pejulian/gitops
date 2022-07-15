@@ -1,7 +1,7 @@
 import { LoggerUtil, LogLevel } from './logger.util';
 import lodash from 'lodash';
-import semver from 'semver';
 import { ProcessorUtil } from './processsor.util';
+import { SemverUtil } from './semver.util';
 
 const { isObject, isArray, isEmpty, isString } = lodash;
 
@@ -10,20 +10,20 @@ export type PackageView = Readonly<{
     _rev: string;
     name: string;
     description: string;
-    'dist-tags': Record<string, string>;
+    'dist-tags': Record<string, string | undefined>;
     versions: Array<string>;
     author: string;
-    time: Record<string, string>;
+    time: Record<string, string | undefined>;
     keywords: Array<string>;
     license: string;
     _cached: boolean;
     _contentLength: number;
     version: string;
-    engines: Record<string, string>;
+    engines: Record<string, string | undefined>;
     dependencies: unknown;
     devDependencies: unknown;
     bin: unknown;
-    scripts: Record<string, string>;
+    scripts: Record<string, string | undefined>;
     [key: string]: unknown;
 }>;
 
@@ -70,15 +70,16 @@ export type PackageJson = Readonly<{
     files?: Array<string>;
     keywords?: Array<string>;
     bin?: Record<string, string>;
-    scripts?: Record<string, string>;
-    dependencies: Record<string, string>;
-    devDependencies?: Record<string, string>;
+    scripts?: Record<string, string | undefined>;
+    dependencies: Record<string, string | undefined>;
+    devDependencies?: Record<string, string | undefined>;
     [key: string]: unknown;
 }>;
 
 export type NpmUtilOptions = Readonly<{
     logger: LoggerUtil;
     processorUtil: ProcessorUtil;
+    semverUtil: SemverUtil;
 }>;
 
 export class NpmUtil {
@@ -89,9 +90,11 @@ export class NpmUtil {
 
     private logger: LoggerUtil;
     private processorUtil: ProcessorUtil;
+    private readonly semverUtil: SemverUtil;
 
     constructor(options: NpmUtilOptions) {
         this.logger = options.logger;
+        this.semverUtil = options.semverUtil;
         this.processorUtil = options.processorUtil;
     }
 
@@ -113,10 +116,107 @@ export class NpmUtil {
         return maybePackageJson;
     }
 
-    public async doesPackageVersionExist(
+    /**
+     * Function that will check if the given package version meets the supplied constraint and condition.
+     * Will return true if either constraint or condition is empty
+     */
+    public async shouldUpdatePackageVersion(
         packageName: string,
-        packageVersion: string
+        currentPackageVersion: string,
+        packageUpdateConstraint?: string,
+        packageUpdateCondition?: 'lte' | 'gte' | 'gt' | 'lt' | 'eq'
     ): Promise<boolean> {
+        if (!packageUpdateConstraint || !packageUpdateCondition) {
+            this.logger.info(
+                `[${NpmUtil.CLASS_NAME}.shouldUpdatePackageVersion]`,
+                `No package version constraint or condition was supplied, the function will assume that the update can proceed.`
+            );
+            return true;
+        }
+
+        try {
+            const targetPackageVersion = await this.getRequestedPackageVersion(
+                packageName,
+                packageUpdateConstraint
+            );
+
+            if (!targetPackageVersion) {
+                throw new Error(
+                    `A target package version could not be resolved for the given costraint ${packageUpdateConstraint}`
+                );
+            }
+
+            let term: string;
+            switch (packageUpdateCondition) {
+                case 'eq':
+                    term = 'equal to';
+                    break;
+                case 'gt':
+                    term = 'greater than';
+                    break;
+                case 'lt':
+                    term = 'less than';
+                    break;
+                case 'gte':
+                    term = 'greater than or equal to';
+                    break;
+                case 'lte':
+                    term = 'less than or equal to';
+                    break;
+                default:
+                    term = '?';
+                    break;
+            }
+
+            this.logger.info(
+                `[${NpmUtil.CLASS_NAME}.shouldUpdatePackageVersion]`,
+                `Testing if current package version "${currentPackageVersion} is ${term} the resolved version constraint ${targetPackageVersion}"`
+            );
+
+            switch (packageUpdateCondition) {
+                case 'eq':
+                    return this.semverUtil.isEqualTo(
+                        currentPackageVersion,
+                        targetPackageVersion
+                    );
+                case 'gt':
+                    return this.semverUtil.isGreaterThan(
+                        currentPackageVersion,
+                        targetPackageVersion
+                    );
+                case 'lt':
+                    return this.semverUtil.isLessThan(
+                        currentPackageVersion,
+                        targetPackageVersion
+                    );
+                case 'gte':
+                    return this.semverUtil.isGreaterThanOrEqualTo(
+                        currentPackageVersion,
+                        targetPackageVersion
+                    );
+                case 'lte':
+                    return this.semverUtil.isLessThanOrEqualTo(
+                        currentPackageVersion,
+                        targetPackageVersion
+                    );
+                default:
+                    this.logger.warn(
+                        `[${NpmUtil.CLASS_NAME}.shouldUpdatePackageVersion]`,
+                        `The provided condition ${packageUpdateCondition} was not recognized. This means that this function will reject the version update.`
+                    );
+                    return false;
+            }
+        } catch (e) {
+            this.logger.error(
+                `[${NpmUtil.CLASS_NAME}.shouldUpdatePackageVersion]`,
+                `Failed to determine if the package ${packageName} should be updated\n`,
+                e
+            );
+            throw e;
+        }
+    }
+
+    public async getPackageView(packageName: string): Promise<PackageView> {
         try {
             const { response, code } = await this.processorUtil.spawnProcess(
                 `npm`,
@@ -132,35 +232,88 @@ export class NpmUtil {
             const packageView = JSON.parse(response);
 
             if (NpmUtil.isPackageView(packageView)) {
-                const { versions, 'dist-tags': distTags } = packageView;
-
-                if (semver.valid(packageVersion)) {
-                    return versions.includes(packageVersion);
-                } else {
-                    return Object.keys(distTags).includes(packageVersion);
-                }
-            } else {
-                throw new Error(
-                    `Failed to parse results of npm view ${packageName}`
-                );
+                return packageView;
             }
+
+            throw new Error(
+                'The command did not return a valid package view format'
+            );
         } catch (e) {
             this.logger.error(
-                `[${NpmUtil.CLASS_NAME}.doesPackageVersionExist]`,
-                `Failed to determine if the package ${packageName} exists\n`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `[${NpmUtil.CLASS_NAME}.getPackageView]`,
+                `Failed to obtain package view for ${packageName}\n`,
+                e
             );
             throw e;
         }
     }
 
+    public async getRequestedPackageVersion(
+        packageName: string,
+        packageVersion: string
+    ) {
+        return this.doesPackageVersionExist(packageName, packageVersion);
+    }
+
+    public async doesPackageVersionExist(
+        packageName: string,
+        packageVersion: string
+    ): Promise<string | undefined> {
+        try {
+            const packageView = await this.getPackageView(packageName);
+
+            const { versions, 'dist-tags': distTags } = packageView;
+
+            let result: string | undefined;
+
+            const sanitizedPackageVersion =
+                this.semverUtil.isValid(packageVersion);
+
+            if (sanitizedPackageVersion) {
+                if (versions.includes(sanitizedPackageVersion)) {
+                    result = lodash.find(
+                        versions,
+                        (version) => version === sanitizedPackageVersion
+                    );
+                }
+            } else {
+                // If not a semver, check if a distribution tag exist for the value given
+                if (Object.keys(distTags).includes(packageVersion)) {
+                    // Return the version that is specified for the given distribution tag if it exists
+                    result = distTags[packageVersion];
+                }
+            }
+
+            if (!result) {
+                this.logger.warn(
+                    `[${NpmUtil.CLASS_NAME}.doesPackageVersionExist]`,
+                    `${packageVersion} was not found in ${packageName}`
+                );
+            }
+
+            return result;
+        } catch (e) {
+            this.logger.error(
+                `[${NpmUtil.CLASS_NAME}.doesPackageVersionExist]`,
+                `Failed to determine if the package ${packageName} exists\n`,
+                e
+            );
+            throw e;
+        }
+    }
+
+    /**
+     * Returns the package version if it exists in package.json or undefined if it doesn't
+     * @param packageJson The package.json file to work on
+     * @param packageName The package name to search for
+     * @param packageType The type of package this is
+     * @returns
+     */
     public static doesDependencyExist(
         packageJson: Record<string, unknown>,
         packageName: string,
         packageType: 'd' | 's' | 'o'
-    ): boolean {
+    ): string | undefined {
         if (!NpmUtil.isPackageJson(packageJson)) {
             throw new Error(
                 `The given file content is not a valid ${NpmUtil.PACKAGE_JSON_FILE_NAME} file`
@@ -175,7 +328,17 @@ export class NpmUtil {
                 : 'dependencies'
         ] as Record<string, string>;
 
-        return Object.keys(dependencies).includes(packageName);
+        if (!dependencies) {
+            throw new Error(
+                `The specified package dependency type was not found in ${NpmUtil.PACKAGE_JSON_FILE_NAME}`
+            );
+        }
+
+        if (Object.keys(dependencies).includes(packageName)) {
+            return dependencies[packageName];
+        }
+
+        return undefined;
     }
 
     /**
@@ -213,7 +376,7 @@ export class NpmUtil {
 
             if (
                 options?.removeOnlyWhen?.keyword &&
-                prepare.includes(options.removeOnlyWhen.keyword)
+                prepare?.includes(options.removeOnlyWhen.keyword)
             ) {
                 this.logger.info(
                     `[${NpmUtil.CLASS_NAME}.removePrepareScript]`,

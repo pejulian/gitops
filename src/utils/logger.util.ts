@@ -3,7 +3,7 @@ import lodash from 'lodash';
 import { Console } from 'console';
 import os from 'os';
 import fse from 'fs-extra';
-import { formatISO } from 'date-fns';
+import { formatISO9075, formatISO } from 'date-fns';
 
 const { compact, isEmpty } = lodash;
 
@@ -19,21 +19,34 @@ export class LoggerUtil {
     private readonly _console: Console;
     private readonly _command: string;
 
+    private readonly _stdOutFile: string;
+    private readonly _stdErrFile: string;
+
+    private _terms: Array<string> = [];
+
     constructor(logLevel: LogLevel = LogLevel.ERROR, command: string) {
         this._logLevel = logLevel;
         this._command = command;
 
+        this._stdOutFile = `${os.homedir()}/${
+            process.env.MODULE_NAME ?? 'git-toolkit'
+        }-${
+            process.env.MODULE_VERSION ?? 'localhost'
+        }-${command}-${formatISO9075(new Date(), {
+            format: 'basic'
+        }).replace(' ', '')}-stdout.txt`;
+
+        this._stdErrFile = `${os.homedir()}/${
+            process.env.MODULE_NAME ?? 'git-toolkit'
+        }-${
+            process.env.MODULE_VERSION ?? 'localhost'
+        }-${command}-${formatISO9075(new Date(), {
+            format: 'basic'
+        }).replace(' ', '')}-stderr.txt`;
+
         this._console = new Console({
-            stdout: fse.createWriteStream(
-                `${os.homedir()}/${process.env.MODULE_NAME ?? 'git-toolkit'}-${
-                    process.env.MODULE_VERSION ?? 'localhost'
-                }-${command}-stdout.txt`
-            ),
-            stderr: fse.createWriteStream(
-                `${os.homedir()}/${process.env.MODULE_NAME ?? 'git-toolkit'}-${
-                    process.env.MODULE_VERSION ?? 'localhost'
-                }-${command}-stderr.txt`
-            )
+            stdout: fse.createWriteStream(this._stdOutFile),
+            stderr: fse.createWriteStream(this._stdErrFile)
         });
     }
 
@@ -42,16 +55,8 @@ export class LoggerUtil {
         outputLog: string;
     }> {
         return {
-            errorLog: `${os.homedir()}/${
-                process.env.MODULE_NAME ?? 'git-toolkit'
-            }-${process.env.MODULE_VERSION ?? 'localhost'}-${
-                this._command
-            }-stderr.txt`,
-            outputLog: `${os.homedir()}/${
-                process.env.MODULE_NAME ?? 'git-toolkit'
-            }-${process.env.MODULE_VERSION ?? 'localhost'}-${
-                this._command
-            }-stderr.txt`
+            errorLog: this._stdErrFile,
+            outputLog: this._stdOutFile
         };
     }
 
@@ -63,37 +68,75 @@ export class LoggerUtil {
         return level <= this._logLevel;
     }
 
+    public appendTermToLogPrefix(term: string) {
+        this._terms.push(term);
+    }
+
+    public clearTermsFromLogPrefix() {
+        this._terms = [];
+    }
+
     public error(message: string, ...args: Array<unknown>): void {
-        this._console.error(formatISO(new Date()), `ERROR`, message, ...args);
+        const messageWithTerms = `${message} ${this._terms
+            .map((term) => `[${term}]`)
+            .join(' ')}`;
+
+        this._console.error(
+            formatISO(new Date()),
+            `ERROR`,
+            messageWithTerms,
+            ...args
+        );
 
         if (!this.isValidLogLevel(LogLevel.ERROR)) {
             return;
         }
 
         const filteredArguments = this.filterArguments(args);
+
         if (filteredArguments) {
-            console.error(chalk.redBright(message), ...filteredArguments);
+            console.error(
+                chalk.redBright(messageWithTerms),
+                ...filteredArguments
+            );
         } else {
-            console.error(chalk.redBright(message));
+            console.error(chalk.redBright(messageWithTerms));
         }
     }
 
     public warn(message: string, ...args: Array<unknown>): void {
-        this._console.log(formatISO(new Date()), `WARN`, message, ...args);
+        const messageWithTerms = `${message}${this._terms
+            .map((term) => `[${term}]`)
+            .join(' ')}`;
+
+        this._console.log(
+            formatISO(new Date()),
+            `WARN`,
+            messageWithTerms,
+            ...args
+        );
 
         if (!this.isValidLogLevel(LogLevel.WARN)) {
             return;
         }
 
         const filteredArguments = this.filterArguments(args);
+
         if (filteredArguments) {
-            console.warn(chalk.yellowBright(message), ...filteredArguments);
+            console.warn(
+                chalk.yellowBright(messageWithTerms),
+                ...filteredArguments
+            );
         } else {
-            console.warn(chalk.yellowBright(message));
+            console.warn(chalk.yellowBright(messageWithTerms));
         }
     }
 
     public info(message: string, ...args: Array<unknown>): void {
+        const messageWithTerms = `${message}${this._terms
+            .map((term) => `[${term}]`)
+            .join(' ')}`;
+
         this._console.log(formatISO(new Date()), `INFO`, message, ...args);
 
         if (!this.isValidLogLevel(LogLevel.INFO)) {
@@ -101,25 +144,42 @@ export class LoggerUtil {
         }
 
         const filteredArguments = this.filterArguments(args);
+
         if (filteredArguments) {
-            console.info(chalk.greenBright(message), ...filteredArguments);
+            console.info(
+                chalk.greenBright(messageWithTerms),
+                ...filteredArguments
+            );
         } else {
-            console.info(chalk.greenBright(message));
+            console.info(chalk.greenBright(messageWithTerms));
         }
     }
 
     public debug(message: string, ...args: Array<unknown>): void {
-        this._console.log(formatISO(new Date()), `DEBUG`, message, ...args);
+        const messageWithTerms = `${message}${this._terms
+            .map((term) => `[${term}]`)
+            .join(' ')}`;
+
+        this._console.log(
+            formatISO(new Date()),
+            `DEBUG`,
+            messageWithTerms,
+            ...args
+        );
 
         if (!this.isValidLogLevel(LogLevel.DEBUG)) {
             return;
         }
 
         const filteredArguments = this.filterArguments(args);
+
         if (filteredArguments) {
-            console.debug(chalk.cyanBright(message), ...filteredArguments);
+            console.debug(
+                chalk.cyanBright(messageWithTerms),
+                ...filteredArguments
+            );
         } else {
-            console.debug(chalk.cyanBright(message));
+            console.debug(chalk.cyanBright(messageWithTerms));
         }
     }
 
@@ -128,7 +188,9 @@ export class LoggerUtil {
         return compact(
             args.map((arg) => {
                 if (arg instanceof Error) {
-                    return arg.message;
+                    return this._logLevel === LogLevel.DEBUG
+                        ? arg
+                        : arg.message;
                 }
                 return arg;
             })

@@ -3,6 +3,7 @@ import { GithubUtil } from '../utils/github.util';
 import { LoggerUtil, LogLevel } from '../utils/logger.util';
 import { NpmUtil } from '../utils/npm.util';
 import { ProcessorUtil } from '../utils/processsor.util';
+import { SemverUtil } from '../utils/semver.util';
 
 export interface IGenericAction<T> {
     run(): Promise<T>;
@@ -36,6 +37,7 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
     protected readonly githubUtil: GithubUtil;
     protected readonly filesystemUtil: FilesystemUtil;
     protected readonly processorUtil: ProcessorUtil;
+    protected readonly semverUtil: SemverUtil;
     protected readonly npmUtil: NpmUtil;
 
     constructor(options: GenericActionOptions) {
@@ -47,9 +49,14 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
             logger: this.logger
         });
 
+        this.semverUtil = new SemverUtil({
+            logger: this.logger
+        });
+
         this.npmUtil = new NpmUtil({
             logger: this.logger,
-            processorUtil: this.processorUtil
+            processorUtil: this.processorUtil,
+            semverUtil: this.semverUtil
         });
 
         this.filesystemUtil = new FilesystemUtil({

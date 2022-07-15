@@ -24,6 +24,8 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
     private packageName: string;
     private packageVersion: string;
     private packageType: UpdatePackageVersionActionOptions['packageType'];
+    private packageUpdateConstraint: UpdatePackageVersionActionOptions['packageUpdateConstraint'];
+    private packageUpdateCondition: UpdatePackageVersionActionOptions['packageUpdateCondition'];
 
     constructor(options: UpdatePackageVersionActionOptions) {
         super({
@@ -40,6 +42,8 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
         this.packageName = options.packageName;
         this.packageVersion = options.packageVersion;
         this.packageType = options.packageType;
+        this.packageUpdateConstraint = options.packageUpdateConstraint;
+        this.packageUpdateCondition = options.packageUpdateCondition;
     }
 
     public async run(): Promise<void> {
@@ -58,19 +62,37 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
         );
 
         try {
-            if (
-                await this.npmUtil.doesPackageVersionExist(
-                    this.packageName,
-                    this.packageVersion
-                )
-            ) {
+            // Determine if the package version that we are trying to update to exists
+            const versionToUse = await this.npmUtil.doesPackageVersionExist(
+                this.packageName,
+                this.packageVersion
+            );
+
+            // If no such version for the package exists, then we stop processing here
+            if (!versionToUse) {
+                this.logger.info(
+                    `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+                    `The specified version ${this.packageVersion} does not exist for the package ${this.packageName}`
+                );
+                return;
+            }
+
+            for await (const organization of this.organizations) {
                 const tmpDir =
                     this.filesystemUtil.createSubdirectoryAtProjectRoot();
 
                 const repositories =
-                    await this.listApplicableRepositoriesForOperation();
+                    await this.listApplicableRepositoriesForOperation(
+                        organization
+                    );
 
-                for (const repository of repositories) {
+                for await (const repository of repositories) {
+                    // When every loop starts, ensure that all previous terms are cleared
+                    this.logger.clearTermsFromLogPrefix();
+
+                    // Append the organization and repo name
+                    this.logger.appendTermToLogPrefix(repository.full_name);
+
                     const descriptorWithTree =
                         await this.githubUtil.findTreeAndDescriptorForFilePath(
                             repository,
@@ -98,7 +120,8 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     const repoPath = await this.updatePackageVersionForProject(
                         repository,
                         descriptorWithTree.descriptors,
-                        tmpDir
+                        tmpDir,
+                        versionToUse
                     );
 
                     // If no repo path is returned, something wrong happened and we should skip...
@@ -134,7 +157,8 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     } catch (e) {
                         this.logger.warn(
                             `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-                            `Failed to upload changes`
+                            `Failed to upload changes\n`,
+                            e
                         );
 
                         continue;
@@ -142,19 +166,12 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 }
 
                 this.filesystemUtil.removeDirectory(tmpDir);
-            } else {
-                this.logger.error(
-                    `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-                    `The specified version ${this.packageVersion} does not exist for the package ${this.packageName}`
-                );
             }
         } catch (e) {
             this.logger.error(
                 `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-                `Internal error while running the operation`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Internal error while running the operation.\n`,
+                e
             );
         }
 
@@ -172,53 +189,48 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
      * Obtains a list of repositories on which the given action should be applied on based on the provided criteria
      * @returns A list of organization repositories to apply this action on
      */
-    public async listApplicableRepositoriesForOperation(): Promise<
-        Array<GitHubRepository>
-    > {
-        let allRepositories: Array<GitHubRepository> = [];
+    public async listApplicableRepositoriesForOperation(
+        organization: string
+    ): Promise<Array<GitHubRepository>> {
+        let repositories: Array<GitHubRepository> = [];
 
-        for (const organization of this.organizations) {
-            let repositories: Array<GitHubRepository>;
-            try {
-                repositories =
-                    await this.githubUtil.listRepositoriesForOrganization(
-                        organization,
-                        {
-                            onlyInclude: this.repositories
-                        }
-                    );
-
-                this.logger.debug(
-                    `[${UpdatePackageVersionAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
-                    `Matched ${
-                        repositories.length
-                    } repositories for ${organization}:\n${repositories
-                        .map((repository, index) => {
-                            return `[${index + 1}] ${repository.name} [${
-                                this.gitRef ??
-                                `heads/${repository.default_branch}`
-                            }]\n`;
-                        })
-                        .join('')}\n`
+        try {
+            repositories =
+                await this.githubUtil.listRepositoriesForOrganization(
+                    organization,
+                    {
+                        onlyInclude: this.repositories
+                    }
                 );
-            } catch (e) {
-                this.logger.warn(
-                    `[${UpdatePackageVersionAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
-                    `Error getting repositories for ${organization}. Operation will skip this organization.`
-                );
-                continue;
-            }
 
-            allRepositories = [...allRepositories, ...repositories];
+            this.logger.debug(
+                `[${UpdatePackageVersionAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
+                `Matched ${
+                    repositories.length
+                } repositories for ${organization}:\n${repositories
+                    .map((repository, index) => {
+                        return `[${index + 1}] ${repository.name} [${
+                            this.gitRef ?? `heads/${repository.default_branch}`
+                        }]\n`;
+                    })
+                    .join('')}\n`
+            );
+        } catch (e) {
+            this.logger.warn(
+                `[${UpdatePackageVersionAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
+                `Error getting repositories for ${organization}. Operation will skip this organization.\n`,
+                e
+            );
         }
 
-        return allRepositories;
+        return repositories;
     }
 
     public async updatePackageVersionForProject(
         repository: GitHubRepository,
         descriptors: GitTreeWithFileDescriptor['descriptors'],
-        tmpDir: string
+        tmpDir: string,
+        versionToUse: string
     ): Promise<string | undefined> {
         const orgPath = this.filesystemUtil.createFolder(
             `${tmpDir}/${repository.owner.login}`
@@ -228,12 +240,14 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             `${orgPath}/${repository.name}`
         );
 
-        const descriptorWithContents: Array<{
+        type DescriptorWithContents = {
             content: string;
             descriptor: GitTreeItem;
-        }> = [];
+        };
+
+        const descriptorWithContents: Array<DescriptorWithContents> = [];
         try {
-            for (const descriptor of descriptors) {
+            for await (const descriptor of descriptors) {
                 const content = await this.githubUtil.getFileDescriptorContent(
                     repository,
                     descriptor,
@@ -249,25 +263,49 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
         } catch (e) {
             this.logger.error(
                 `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
-                `Failed to obtain file contents for descriptors`
+                `Failed to obtain file contents for descriptors\n`,
+                e
             );
 
             return undefined;
         }
 
-        const lockfileDescriptorAndContent = _.find(
-            descriptorWithContents,
-            (item) =>
-                item.descriptor.path?.includes(NpmUtil.LOCKFILE_FILE_NAME) ??
-                false
-        );
-        const packageJsonDescriptorAndContent = _.find(
-            descriptorWithContents,
-            (item) =>
-                item.descriptor.path?.includes(
-                    NpmUtil.PACKAGE_JSON_FILE_NAME
-                ) ?? false
-        );
+        let lockfileDescriptorAndContent: DescriptorWithContents | undefined;
+
+        try {
+            lockfileDescriptorAndContent = _.find(
+                descriptorWithContents,
+                (item) =>
+                    item.descriptor.path?.includes(
+                        NpmUtil.LOCKFILE_FILE_NAME
+                    ) ?? false
+            );
+        } catch (e) {
+            this.logger.error(
+                `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
+                `Failed to read ${NpmUtil.LOCKFILE_FILE_NAME} descriptor\n`,
+                e
+            );
+            throw e;
+        }
+
+        let packageJsonDescriptorAndContent: DescriptorWithContents | undefined;
+
+        try {
+            packageJsonDescriptorAndContent = _.find(
+                descriptorWithContents,
+                (item) =>
+                    item.descriptor.path?.includes(
+                        NpmUtil.PACKAGE_JSON_FILE_NAME
+                    ) ?? false
+            );
+        } catch (e) {
+            this.logger.error(
+                `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
+                `Failed to read ${NpmUtil.PACKAGE_JSON_FILE_NAME} descriptor`
+            );
+            throw e;
+        }
 
         if (!lockfileDescriptorAndContent || !packageJsonDescriptorAndContent) {
             this.logger.error(
@@ -291,13 +329,13 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 packageJsonDescriptorAndContent.content
             );
 
-            if (
-                !NpmUtil.doesDependencyExist(
-                    maybePackageJson,
-                    this.packageName,
-                    this.packageType
-                )
-            ) {
+            const theExistingVersion = NpmUtil.doesDependencyExist(
+                maybePackageJson,
+                this.packageName,
+                this.packageType
+            );
+
+            if (!theExistingVersion) {
                 this.logger.info(
                     `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
                     `The npm package ${this.packageName} is not installed in ${repository.full_name}`
@@ -314,7 +352,25 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     }
                 });
 
-            packageJsonDescriptorAndContent.descriptor.mode;
+            // Now we will consider any constraints and conditions that are specified before proceeding with the update
+            // If no constraint or condition is given, we will assume that any version given is good and will proceed with the update
+            // If provided, we will first ensure that the existing package meets the given constraints and conditions before proceeeding
+            // with the update.
+            if (
+                !(await this.npmUtil.shouldUpdatePackageVersion(
+                    this.packageName,
+                    theExistingVersion,
+                    this.packageUpdateConstraint,
+                    this.packageUpdateCondition
+                ))
+            ) {
+                this.logger.info(
+                    `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+                    `The update constraint was not fulfilled:- update will be skipped`
+                );
+
+                return undefined;
+            }
 
             this.filesystemUtil.writeFile(
                 `${repoPath}/${packageJsonDescriptorAndContent.descriptor.path}`,
@@ -347,7 +403,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 [
                     'install',
                     `-${this.packageType}`,
-                    `${this.packageName}@${this.packageVersion}`
+                    `${this.packageName}@${versionToUse}`
                 ],
                 {
                     cwd: repoPath
@@ -391,7 +447,8 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
         } catch (e) {
             this.logger.error(
                 `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
-                `The package update for ${this.packageName} failed`
+                `The package update for ${this.packageName} failed\n`,
+                e
             );
 
             return undefined;

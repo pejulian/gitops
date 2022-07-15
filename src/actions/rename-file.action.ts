@@ -57,7 +57,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
         const repositories =
             await this.listApplicableRepositoriesForOperation();
 
-        for (const repository of repositories) {
+        for await (const repository of repositories) {
             const descriptorWithTree =
                 await this.githubUtil.findTreeAndDescriptorForFilePath(
                     repository,
@@ -101,7 +101,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
     > {
         let allRepositories: Array<GitHubRepository> = [];
 
-        for (const organization of this.organizations) {
+        for await (const organization of this.organizations) {
             const repositories =
                 await this.githubUtil.listRepositoriesForOrganization(
                     organization,

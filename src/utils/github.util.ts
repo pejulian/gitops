@@ -141,10 +141,8 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.listRepositoriesForOrganization]`,
-                `Could not list repositories for ${organization}`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Could not list repositories for ${organization}\n`,
+                e
             );
 
             throw e;
@@ -192,10 +190,8 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getRepositoryGitTree]`,
-                `Could not get repository tree with ref ${ref} for ${repository.full_name}`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Could not get repository tree with ref ${ref} for ${repository.full_name}\n`,
+                e
             );
 
             throw e;
@@ -236,10 +232,8 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.listReleaseTags]`,
-                `Could not list release tags for ${repository.full_name}`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Could not list release tags for ${repository.full_name}\n`,
+                e
             );
 
             throw e;
@@ -265,10 +259,8 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.listLastReleaseTag]`,
-                `Could not list the last release tag for ${repository.full_name}`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Could not list the last release tag for ${repository.full_name}\n`,
+                e
             );
 
             throw e;
@@ -297,10 +289,8 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.listLast50ReleaseTags]`,
-                `Could not list the last 50 release tags for ${repository.full_name}`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Could not list the last 50 release tags for ${repository.full_name}\n`,
+                e
             );
 
             throw e;
@@ -340,10 +330,8 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getTree]`,
-                `Could not obtain tree "${tree_sha}" from ${repository.full_name}`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Could not obtain tree "${tree_sha}" from ${repository.full_name}\n`,
+                e
             );
             throw e;
         }
@@ -453,9 +441,7 @@ export class GithubUtil {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getCommit]`,
                 `Could not obtain commit "${commit_sha}" from ${repository.full_name}\n`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                e
             );
             throw e;
         }
@@ -488,9 +474,7 @@ export class GithubUtil {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.createCommit]`,
                 `Failed to create a new commit for ${repository.full_name} with the given tree SHA ${treeSHA} and commit SHA ${commitSHA}\n`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                e
             );
             throw e;
         }
@@ -521,9 +505,8 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.createBlobForFile]`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Failed to create file blob for ${filePath}\n`,
+                e
             );
             throw e;
         }
@@ -694,10 +677,8 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getReference]`,
-                `Could not obtain reference "${reference}" from ${repository.full_name}`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Could not obtain reference "${reference}" from ${repository.full_name}\n`,
+                e
             );
             throw e;
         }
@@ -861,9 +842,7 @@ export class GithubUtil {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getContent]`,
                 `${path} does not exist/cannot be read in ${repository.full_name}\n`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                e
             );
 
             throw e;
@@ -903,9 +882,7 @@ export class GithubUtil {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.listDirectoryFilesInRepo]`,
                 `${path} does not exist/cannot be read in ${repository.full_name}\n`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                e
             );
         }
 
@@ -943,9 +920,7 @@ export class GithubUtil {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getBlob]`,
                 `${file_sha} cannot be read in ${repository.full_name}\n`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                e
             );
             throw e;
         }
@@ -1006,9 +981,7 @@ export class GithubUtil {
             this.logger.warn(
                 `[${GithubUtil.CLASS_NAME}.findTreeAndDescriptorForFilePath]`,
                 `Skipping ${repository.full_name} due to an issue\n`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                e
             );
 
             return undefined;
@@ -1033,9 +1006,7 @@ export class GithubUtil {
             this.logger.warn(
                 `[${GithubUtil.CLASS_NAME}.setCommmitBranch]`,
                 `Failed to set commit branch for ${repository.full_name} <${ref}>\n`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                e
             );
 
             throw e;

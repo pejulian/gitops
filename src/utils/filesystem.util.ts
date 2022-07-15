@@ -45,10 +45,8 @@ export class FilesystemUtil {
         } catch (e) {
             this.logger.error(
                 `[${FilesystemUtil.CLASS_NAME}.readFile]`,
-                `Failed to read file at ${filePath}`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Failed to read file at ${filePath}\n`,
+                e
             );
             return undefined;
         }
@@ -79,10 +77,8 @@ export class FilesystemUtil {
         } catch (e) {
             this.logger.error(
                 `[${FilesystemUtil.CLASS_NAME}.writeJsonFile]`,
-                `Failed to write JSON file to ${filePath}`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Failed to write JSON file to ${filePath}\n`,
+                e
             );
         }
     }
@@ -112,10 +108,8 @@ export class FilesystemUtil {
         } catch (e) {
             this.logger.error(
                 `[${FilesystemUtil.CLASS_NAME}.writeFile]`,
-                `Failed to write file to ${filePath}`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                `Failed to write file to ${filePath}\n`,
+                e
             );
             return undefined;
         }
@@ -196,9 +190,7 @@ export class FilesystemUtil {
             this.logger.error(
                 `[${FilesystemUtil.CLASS_NAME}.writeFile]`,
                 `Failed to create directory ${name}\n`,
-                this.logger.logLevel === LogLevel.DEBUG
-                    ? e
-                    : (e as Error).message
+                e
             );
             throw e;
         }
@@ -217,6 +209,11 @@ export class FilesystemUtil {
             fse.removeSync(path);
             return true;
         } catch (e) {
+            this.logger.error(
+                `[${FilesystemUtil.CLASS_NAME}.removeDirectory]`,
+                `Failed to remove directory ${path}\n`,
+                e
+            );
             return false;
         }
     }

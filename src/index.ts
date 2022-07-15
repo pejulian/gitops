@@ -21,6 +21,8 @@ export type GitToolkitCommands = {
         packageName: string;
         packageVersion: string;
         packageType: 'd' | 's' | 'o';
+        packageUpdateConstraint?: string;
+        packageUpdateCondition?: 'gte' | 'gt' | 'eq' | 'lte' | 'lt';
         repositories?: string;
     }> &
         GitToolkitCommands['Common'];
@@ -96,6 +98,16 @@ const packageTypeOption = new Option(
     .choices(['s', 'd', 'o'])
     .default('s');
 
+const packageUpdateConstraint = new Option(
+    `--package-update-constraint <value>`,
+    `[OPTIONAL] This flag applies checks to the CURRENT VERSION OF THE PACKAGE INSTALLED. A valid semver string (e.g. 2.x.x) or distribution tag (e.g. latest, beta) to determines if the CURRENT PACKAGE VERSION meets the criteria to be updated (only works if an update condition has been specified via the --package-update-constraint flag)`
+);
+
+const packageUpdateCondition = new Option(
+    `--package-update-condition <value>`,
+    `[OPTIONAL] This flag applies checks to the CURRENT VERSION OF THE PACKAGE INSTALLED. Apply a package update condition on the CURRENT PACKAGE VERSION to determine if it satisfies the constraint supplied in --package-update-constraint`
+).choices(['lt', 'lte', 'gt', 'gte', 'eq']);
+
 program
     .command('rename-file')
     .usage(
@@ -137,6 +149,8 @@ program
     .addOption(packageNameOption)
     .addOption(packageVersionOption)
     .addOption(packageTypeOption)
+    .addOption(packageUpdateCondition)
+    .addOption(packageUpdateConstraint)
     .action(async (options: GitToolkitCommands['UpdatePackageVersion']) => {
         const action = new UpdatePackageVersionAction(options);
         await action.run();
