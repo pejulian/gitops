@@ -31,7 +31,7 @@ export type GitToolkitCommands = {
 const program = new Command();
 
 program
-    .name(process.env.MODULE_NAME ?? 'git-toolkit')
+    .name(process.env.MODULE_NAME ?? 'pejulian-toolkit')
     .version(process.env.MODULE_VERSION ?? 'localhost')
     .showHelpAfterError(true);
 

@@ -108,7 +108,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                             `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
                             `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${
                                 NpmUtil.LOCKFILE_FILE_NAME
-                            } was not found in ${repository.full_name} <${
+                            } was not found in ${repository.name} <${
                                 this.gitRef ??
                                 `heads/${repository.default_branch}`
                             }>`
@@ -338,7 +338,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             if (!theExistingVersion) {
                 this.logger.info(
                     `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
-                    `The npm package ${this.packageName} is not installed in ${repository.full_name}`
+                    `The npm package ${this.packageName} is not installed in ${repository.name}`
                 );
 
                 return undefined;
@@ -366,7 +366,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             ) {
                 this.logger.info(
                     `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-                    `The update constraint was not fulfilled:- update will be skipped`
+                    `The update constraint was not fulfilled, update will be skipped`
                 );
 
                 return undefined;

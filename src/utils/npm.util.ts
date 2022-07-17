@@ -1,4 +1,4 @@
-import { LoggerUtil, LogLevel } from './logger.util';
+import { LoggerUtil } from './logger.util';
 import lodash from 'lodash';
 import { ProcessorUtil } from './processsor.util';
 import { SemverUtil } from './semver.util';
@@ -91,6 +91,8 @@ export class NpmUtil {
     private logger: LoggerUtil;
     private processorUtil: ProcessorUtil;
     private readonly semverUtil: SemverUtil;
+
+    private _npmViewCache: Record<string, PackageView> = {};
 
     constructor(options: NpmUtilOptions) {
         this.logger = options.logger;
@@ -217,6 +219,14 @@ export class NpmUtil {
     }
 
     public async getPackageView(packageName: string): Promise<PackageView> {
+        if (Object.keys(this._npmViewCache).includes(packageName)) {
+            this.logger.debug(
+                `[${NpmUtil.CLASS_NAME}.getPackageView]`,
+                `Cached package view was found for ${packageName}`
+            );
+            return this._npmViewCache[packageName];
+        }
+
         try {
             const { response, code } = await this.processorUtil.spawnProcess(
                 `npm`,
@@ -232,6 +242,7 @@ export class NpmUtil {
             const packageView = JSON.parse(response);
 
             if (NpmUtil.isPackageView(packageView)) {
+                this._npmViewCache[packageName] = packageView;
                 return packageView;
             }
 
@@ -248,14 +259,14 @@ export class NpmUtil {
         }
     }
 
+    /**
+     * Gets the requested version of a package if it exists
+     *
+     * @param packageName The package name to scan for
+     * @param packageVersion The package version to match
+     * @returns
+     */
     public async getRequestedPackageVersion(
-        packageName: string,
-        packageVersion: string
-    ) {
-        return this.doesPackageVersionExist(packageName, packageVersion);
-    }
-
-    public async doesPackageVersionExist(
         packageName: string,
         packageVersion: string
     ): Promise<string | undefined> {
@@ -275,31 +286,41 @@ export class NpmUtil {
                         versions,
                         (version) => version === sanitizedPackageVersion
                     );
+                } else {
+                    this.logger.warn(
+                        `[${NpmUtil.CLASS_NAME}.getRequestedPackageVersion]`,
+                        `${packageVersion} was not found in ${packageName}.`
+                    );
                 }
             } else {
                 // If not a semver, check if a distribution tag exist for the value given
                 if (Object.keys(distTags).includes(packageVersion)) {
                     // Return the version that is specified for the given distribution tag if it exists
                     result = distTags[packageVersion];
+                } else {
+                    this.logger.warn(
+                        `[${NpmUtil.CLASS_NAME}.getRequestedPackageVersion]`,
+                        `${packageVersion} is not a a valid dist tag for ${packageName}.`
+                    );
                 }
-            }
-
-            if (!result) {
-                this.logger.warn(
-                    `[${NpmUtil.CLASS_NAME}.doesPackageVersionExist]`,
-                    `${packageVersion} was not found in ${packageName}`
-                );
             }
 
             return result;
         } catch (e) {
             this.logger.error(
-                `[${NpmUtil.CLASS_NAME}.doesPackageVersionExist]`,
-                `Failed to determine if the package ${packageName} exists\n`,
+                `[${NpmUtil.CLASS_NAME}.getRequestedPackageVersion]`,
+                `Failed to determine if the package version ${packageVersion} exists in ${packageName}.\n`,
                 e
             );
             throw e;
         }
+    }
+
+    public async doesPackageVersionExist(
+        packageName: string,
+        packageVersion: string
+    ): Promise<string | undefined> {
+        return this.getRequestedPackageVersion(packageName, packageVersion);
     }
 
     /**

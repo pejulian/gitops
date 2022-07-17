@@ -1,7 +1,7 @@
 import { WriteFileOptions, realpathSync } from 'fs';
 import { relative, dirname, join } from 'path';
 import fse from 'fs-extra';
-import { LoggerUtil, LogLevel } from './logger.util';
+import { LoggerUtil } from './logger.util';
 import { fileURLToPath } from 'url';
 import { globby, Options as GlobbyOptions } from 'globby';
 

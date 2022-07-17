@@ -24,7 +24,13 @@ export class SemverUtil {
         });
 
         if (!result) {
-            return null;
+            result = semver.coerce(testStr, {
+                loose: true
+            })?.version;
+
+            if (!result) {
+                return null;
+            }
         }
 
         result = semver.valid(result);

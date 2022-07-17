@@ -58,6 +58,12 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
             await this.listApplicableRepositoriesForOperation();
 
         for await (const repository of repositories) {
+            // When every loop starts, ensure that all previous terms are cleared
+            this.logger.clearTermsFromLogPrefix();
+
+            // Append the organization and repo name
+            this.logger.appendTermToLogPrefix(repository.full_name);
+
             const descriptorWithTree =
                 await this.githubUtil.findTreeAndDescriptorForFilePath(
                     repository,
@@ -71,7 +77,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                     `[${RenameFileAction.CLASS_NAME}.run]`,
                     `The target file path ${
                         this.targetFilePath
-                    } was not found in ${repository.full_name} <${
+                    } was not found in ${repository.name} <${
                         this.gitRef ?? `heads/${repository.default_branch}`
                     }>`
                 );

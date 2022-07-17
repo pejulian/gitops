@@ -6,7 +6,7 @@ import { operations, components } from '@octokit/openapi-types';
 
 import { Agent } from 'https';
 import { FilesystemUtil, GlobOptions } from './filesystem.util';
-import { LoggerUtil, LogLevel } from './logger.util';
+import { LoggerUtil } from './logger.util';
 
 export type GitHubRepository = components['schemas']['minimal-repository'];
 
@@ -165,7 +165,7 @@ export class GithubUtil {
 
             if (!reference) {
                 throw new Error(
-                    `No reference found in ${repository.full_name}: <${ref}>`
+                    `No reference found in ${repository.name}: <${ref}>`
                 );
             }
 
@@ -190,7 +190,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getRepositoryGitTree]`,
-                `Could not get repository tree with ref ${ref} for ${repository.full_name}\n`,
+                `Could not get repository tree with ref ${ref} for ${repository.name}\n`,
                 e
             );
 
@@ -232,7 +232,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.listReleaseTags]`,
-                `Could not list release tags for ${repository.full_name}\n`,
+                `Could not list release tags for ${repository.name}\n`,
                 e
             );
 
@@ -259,7 +259,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.listLastReleaseTag]`,
-                `Could not list the last release tag for ${repository.full_name}\n`,
+                `Could not list the last release tag for ${repository.name}\n`,
                 e
             );
 
@@ -289,7 +289,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.listLast50ReleaseTags]`,
-                `Could not list the last 50 release tags for ${repository.full_name}\n`,
+                `Could not list the last 50 release tags for ${repository.name}\n`,
                 e
             );
 
@@ -330,7 +330,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getTree]`,
-                `Could not obtain tree "${tree_sha}" from ${repository.full_name}\n`,
+                `Could not obtain tree "${tree_sha}" from ${repository.name}\n`,
                 e
             );
             throw e;
@@ -440,7 +440,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getCommit]`,
-                `Could not obtain commit "${commit_sha}" from ${repository.full_name}\n`,
+                `Could not obtain commit "${commit_sha}" from ${repository.name}\n`,
                 e
             );
             throw e;
@@ -473,7 +473,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.createCommit]`,
-                `Failed to create a new commit for ${repository.full_name} with the given tree SHA ${treeSHA} and commit SHA ${commitSHA}\n`,
+                `Failed to create a new commit for ${repository.name} with the given tree SHA ${treeSHA} and commit SHA ${commitSHA}\n`,
                 e
             );
             throw e;
@@ -546,7 +546,7 @@ export class GithubUtil {
     ) {
         this.logger.debug(
             `[${GithubUtil.CLASS_NAME}.uploadToRepository]`,
-            `Uploading to ${repository.full_name} <${ref}> from ${uploadDirPath}`
+            `Uploading to ${repository.name} <${ref}> from ${uploadDirPath}`
         );
 
         // https://stackoverflow.com/questions/31563444/rename-a-file-with-github-api
@@ -677,7 +677,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getReference]`,
-                `Could not obtain reference "${reference}" from ${repository.full_name}\n`,
+                `Could not obtain reference "${reference}" from ${repository.name}\n`,
                 e
             );
             throw e;
@@ -820,7 +820,7 @@ export class GithubUtil {
             if (response.status !== 200) {
                 this.logger.error(
                     `[${GithubUtil.CLASS_NAME}.getContent]`,
-                    `Read fail ${path} in ${repository.full_name} <${options?.ref}>`
+                    `Read fail for ${path} in ${repository.name} <${options?.ref}> [code: ${response.status}]`
                 );
 
                 throw new Error(
@@ -834,14 +834,14 @@ export class GithubUtil {
 
             this.logger.debug(
                 `[${GithubUtil.CLASS_NAME}.getContent]`,
-                `Read ${path} in ${repository.full_name} <${options?.ref}>`
+                `Read ${path} in ${repository.name} <${options?.ref}>`
             );
 
             return fileContent;
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getContent]`,
-                `${path} does not exist/cannot be read in ${repository.full_name}\n`,
+                `${path} does not exist/cannot be read in ${repository.name}\n`,
                 e
             );
 
@@ -881,7 +881,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.listDirectoryFilesInRepo]`,
-                `${path} does not exist/cannot be read in ${repository.full_name}\n`,
+                `${path} does not exist/cannot be read in ${repository.name}\n`,
                 e
             );
         }
@@ -919,7 +919,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getBlob]`,
-                `${file_sha} cannot be read in ${repository.full_name}\n`,
+                `${file_sha} cannot be read in ${repository.name}\n`,
                 e
             );
             throw e;
@@ -966,7 +966,7 @@ export class GithubUtil {
 
                 if (!fileDescriptor) {
                     throw new Error(
-                        `No such file ${filePath} found at the root of ${repository.full_name}`
+                        `No such file ${filePath} found in ${repository.name}`
                     );
                 }
 
@@ -980,7 +980,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.warn(
                 `[${GithubUtil.CLASS_NAME}.findTreeAndDescriptorForFilePath]`,
-                `Skipping ${repository.full_name} due to an issue\n`,
+                `Skipping ${repository.name}\n`,
                 e
             );
 
@@ -1005,7 +1005,7 @@ export class GithubUtil {
         } catch (e) {
             this.logger.warn(
                 `[${GithubUtil.CLASS_NAME}.setCommmitBranch]`,
-                `Failed to set commit branch for ${repository.full_name} <${ref}>\n`,
+                `Failed to set commit branch for ${repository.name} <${ref}>\n`,
                 e
             );
 

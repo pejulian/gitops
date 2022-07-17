@@ -1,16 +1,16 @@
 {
-    "name": "git-toolkit",
-    "description": "Swiss army knife for doing all sorts of cool stuff on your Git setup",
+    "name": "pejulian-toolkit",
+    "description": "Swiss army knife for running DevOps like tasks on NPM based repositories in your Git organization",
     "type": "module",
     "author": "Julian Pereira",
     "license": "ISC",
-    "version": "0.0.0-beta.0",
+    "version": "0.0.1",
     "engines": {
         "node": ">=16",
         "npm": ">=8"
     },
     "bin": {
-        "git-toolkit": "./dist/index.js"
+        "pejulian-toolkit": "./dist/index.js"
     },
     "exports": {
         ".": {
@@ -53,10 +53,10 @@
     },
     "repository": {
         "type": "git",
-        "url": "git@github.topdanmark.local:ln0/git-toolkit.git"
+        "url": "git@github.topdanmark.local:ln0/pejulian-toolkit.git"
     },
     "bugs": {
-        "url": "https://github.topdanmark.local/ln0/git-toolkit/issues"
+        "url": "https://github.topdanmark.local/ln0/pejulian-toolkit/issues"
     },
     "publishConfig": {
         "registry": "http://artifactory.topdanmark.local/artifactory/api/npm/npm-local"

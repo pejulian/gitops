@@ -29,7 +29,7 @@ export class LoggerUtil {
         this._command = command;
 
         this._stdOutFile = `${os.homedir()}/${
-            process.env.MODULE_NAME ?? 'git-toolkit'
+            process.env.MODULE_NAME ?? 'pejulian-toolkit'
         }-${
             process.env.MODULE_VERSION ?? 'localhost'
         }-${command}-${formatISO9075(new Date(), {
@@ -37,7 +37,7 @@ export class LoggerUtil {
         }).replace(' ', '')}-stdout.txt`;
 
         this._stdErrFile = `${os.homedir()}/${
-            process.env.MODULE_NAME ?? 'git-toolkit'
+            process.env.MODULE_NAME ?? 'pejulian-toolkit'
         }-${
             process.env.MODULE_VERSION ?? 'localhost'
         }-${command}-${formatISO9075(new Date(), {
