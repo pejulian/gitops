@@ -12,6 +12,9 @@ const plugins: webpack.Configuration['plugins'] = [
     }),
     new webpack.DefinePlugin({
         'process.env.MODULE_NAME': JSON.stringify(`${packageJson.name}`),
+        'process.env.MODULE_DESCRIPTION': JSON.stringify(
+            `${packageJson.description}`
+        ),
         'process.env.MODULE_VERSION': JSON.stringify(`${packageJson.version}`),
         'process.env.WEBPACK_BUILD': JSON.stringify(`webpack`)
     })

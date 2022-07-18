@@ -9,6 +9,10 @@ declare namespace NodeJS {
          */
         readonly MODULE_VERSION?: string;
         /**
+         * The resolved package description
+         */
+        readonly MODULE_DESCRIPTION: string;
+        /**
          * Determines if the code is executed from a webpack build
          */
         readonly WEBPACK_BUILD: string;

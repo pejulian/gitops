@@ -1,5 +1,5 @@
 {
-    "name": "pejulian-toolkit",
+    "name": "gitops",
     "description": "Swiss army knife for running DevOps like tasks on NPM based repositories in your Git organization",
     "type": "module",
     "author": "Julian Pereira",
@@ -10,7 +10,7 @@
         "npm": ">=8"
     },
     "bin": {
-        "pejulian-toolkit": "./dist/index.js"
+        "gitops": "./dist/index.js"
     },
     "exports": {
         ".": {
@@ -53,10 +53,10 @@
     },
     "repository": {
         "type": "git",
-        "url": "git@github.topdanmark.local:ln0/pejulian-toolkit.git"
+        "url": "git@github.topdanmark.local:ln0/gitops.git"
     },
     "bugs": {
-        "url": "https://github.topdanmark.local/ln0/pejulian-toolkit/issues"
+        "url": "https://github.topdanmark.local/ln0/gitops/issues"
     },
     "publishConfig": {
         "registry": "http://artifactory.topdanmark.local/artifactory/api/npm/npm-local"

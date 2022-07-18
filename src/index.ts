@@ -26,12 +26,19 @@ export type GitToolkitCommands = {
         repositories?: string;
     }> &
         GitToolkitCommands['Common'];
+    EnsureDeployability: Readonly<{
+        runTest?: boolean;
+        runBuild?: boolean;
+        mandatoryFiles?: Array<string>;
+    }> &
+        GitToolkitCommands['Common'];
 };
 
 const program = new Command();
 
 program
-    .name(process.env.MODULE_NAME ?? 'pejulian-toolkit')
+    .name(process.env.MODULE_NAME ?? 'gitops')
+    .summary(process.env.MODULE_DESCRIPTION ?? 'gitops')
     .version(process.env.MODULE_VERSION ?? 'localhost')
     .showHelpAfterError(true);
 
@@ -83,17 +90,17 @@ const newFileNameOption = new Option(
 
 const packageNameOption = new Option(
     `--package-name <value>`,
-    `The name of the NPM package to search for in package.json`
+    `The name of the NPM package to search for in package.json (for example @types/jest)`
 ).makeOptionMandatory(true);
 
 const packageVersionOption = new Option(
     `--package-version <value>`,
-    `The version of the NPM package to update. This value must be a valid semver syntax or an existing version tag like "latest", "beta"`
+    `The version of the NPM package to update. This value must be a valid semver syntax or an existing NPM distribution tag like "latest", "beta", "canary" etc. Run npm view <package_name> to view the versions and distribution tags that are available for the project you are trying to update.`
 ).makeOptionMandatory(true);
 
 const packageTypeOption = new Option(
     `--package-type <value>`,
-    `The type of dependency. Specify "s" for a normal dependency, "d" for devDependencies or "o" for optionalDependencies`
+    `[OPTIONAL] The type of dependency. Specify "s" for a normal dependency, "d" for devDependencies or "o" for optionalDependencies`
 )
     .choices(['s', 'd', 'o'])
     .default('s');
@@ -112,10 +119,27 @@ program
     .command('rename-file')
     .usage(
         `
--o ORGANIZATIONS,..., n [-p GITBUB_TOKEN_FILE_PATH -t GITHUB_TOKEN -l ERROR|WARN|INFO|DEBUG -f GIT_REF -r REPOSITORIES, ..., n | RegExp ]
+-o ORGANIZATIONS,..., n  --target-file-path path/to/file/in/repo/file.extension --new-file-name newFileName.extension [-p GITBUB_TOKEN_FILE_PATH -t GITHUB_TOKEN -l ERROR|WARN|INFO|DEBUG -f GIT_REF -r RegExp ]
 
-Example:
-npx github-toolkit@latest -o c9 --target-file-path scripts/topdanmark-webplatform-prod-01.json --new-file-name scripts/topdanmark-webplatform-prod.json
+Examples:
+
+Run a rename operation across ALL repositories in the Git organization "c9" where the the file at path scripts/topdanmark-webplatform-prod-01.json will be renamed to scripts/topdanmark-webplatform-prod.json. All other settings will use defaults which are log level will be INFO and the branch used will be the default branch of the repository.
+
+npx gitops rename-file \
+    -o c9 \
+    --target-file-path scripts/topdanmark-webplatform-prod-01.json \
+    --new-file-name topdanmark-webplatform-prod.json
+
+Run a rename operation for just one repository in the ragnarok Git organization called assistant-service-api where the the file at path scripts/topdanmark-webplatform-prod-01.json will be renamed to scripts/topdanmark-webplatform-prod.json. Default settings are overriden where the operation will run with a DEBUG log level and the operation will run only on the development branch of each repository, if it exists.
+
+npx gitops rename-file \
+    -o ragnarok \
+    -l DEBUG \
+    -f heads/development \
+    -t abc123 \
+    -r assistant-service-api \
+    --target-file-path scripts/topdanmark-webplatform-prod-01.json \
+    --new-file-name topdanmark-webplatform-prod.json
         `
     )
     .summary(
@@ -139,7 +163,35 @@ program
     .summary(
         `Updates the version of an existing npm package in package.json for all affected repositories in the given organizations`
     )
-    .usage(``)
+    .usage(
+        `
+-o ORGANIZATIONS,..., n [-p GITBUB_TOKEN_FILE_PATH -t GITHUB_TOKEN -l ERROR|WARN|INFO|DEBUG -f GIT_REF -r RegExp ]
+
+Examples:
+
+This command will update the development dependency c9-cdk-nodejs in all repositories in the GitHub organization named c9 with the version 2.2.0 IF the existing version of c9-cdk-nodejs in the scanned repository has a version that is greater or equal to 2.0.0. The operation will use the default log level, INFO
+
+npx gitops update-package-version \
+  -o c9 \
+  --package-name "c9-deploy" \
+  --package-version "2.2.0" \
+  --package-type d \
+  --package-update-constraint "2.0.0" \
+  --package-update-condition gte
+
+This command will update the development dependency c9-deploy in the repository c9-login-refresh in the GitHub organization named c9 (if it exists) with the most current latest version IF the existing version of c9-deploy in the scanned repository has a version that is less than 2.2.2. The operation will run with the log level of DEBUG. The operation will run on the default branch of each repository scanned.
+
+npx gitops update-package-version \
+  -o c9 \
+  -l DEBUG \
+  -r "c9-login-refresh" \
+  --package-name "c9-deploy" \
+  --package-version "2.2.0" \
+  --package-type d \
+  --package-update-constraint "1.9.0" \
+  --package-update-condition lte
+`
+    )
     .addOption(tokenFilePathOption)
     .addOption(githubTokenOption)
     .addOption(logLevelOption)
