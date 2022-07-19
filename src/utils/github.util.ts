@@ -157,7 +157,7 @@ export class GithubUtil {
      */
     public async getRepositoryGitTree(
         repository: GitHubRepository,
-        ref = 'heads/master',
+        ref = `heads/${repository.default_branch}`,
         recursive?: boolean
     ): Promise<GitTree> {
         try {
@@ -400,7 +400,7 @@ export class GithubUtil {
      */
     public async getCurrentCommit(
         repository: GitHubRepository,
-        ref = 'heads/master'
+        ref = `heads/${repository.default_branch}`
     ): Promise<CurrentCommitSha> {
         const { object: refObject } = await this.getReference(repository, ref);
         const sha = refObject.sha;
@@ -532,7 +532,7 @@ export class GithubUtil {
         uploadDirPath: string,
         repository: GitHubRepository,
         commitMessage: string,
-        ref = 'heads/master',
+        ref = `heads/${repository.default_branch}`,
         fileDescriptorWithTree?: GitTreeWithFileDescriptor,
         options: Readonly<{
             removeSubtrees: boolean;
@@ -755,7 +755,7 @@ export class GithubUtil {
         repository: GitHubRepository,
         fileDescriptor: GitTreeItem,
         options: GetContentOptions | GetBlobOptions = {
-            ref: 'heads/master',
+            ref: `heads/${repository.default_branch}`,
             encoding: 'utf-8'
         }
     ) {
@@ -930,14 +930,14 @@ export class GithubUtil {
      * Search the given repository for a list of file path on the specified ref
      * @param repository The repository where the file path will be searched
      * @param filePaths A list of file paths to search for (e.g. /etc/v1/foo.json, ./eslintrc, ./src/v1/utils/path.ts)
-     * @param ref The git ref (e.g. heads/master)
+     * @param ref The git ref (e.g. heads/master), will fallback to use the repository default branch if not specified
      * @param recursive Should the search be done for all sub trees of the repositories trees.
      * @returns
      */
     public async findTreeAndDescriptorForFilePath(
         repository: GitHubRepository,
         filePaths: Array<string>,
-        ref = 'heads/master',
+        ref = `heads/${repository.default_branch}`,
         recursive?: boolean
     ): Promise<GitTreeWithFileDescriptor | undefined> {
         const fileDescriptors: Array<GitTreeItem> = [];
@@ -990,7 +990,7 @@ export class GithubUtil {
 
     public async setCommmitBranch(
         repository: GitHubRepository,
-        ref = 'heads/master',
+        ref = `heads/${repository.default_branch}`,
         commitSha: string
     ): Promise<GitReference> {
         try {

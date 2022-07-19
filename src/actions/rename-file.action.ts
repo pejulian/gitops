@@ -68,7 +68,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                 await this.githubUtil.findTreeAndDescriptorForFilePath(
                     repository,
                     [this.targetFilePath],
-                    this.gitRef ?? `heads/${repository.default_branch}`,
+                    this.gitRef,
                     true
                 );
 
@@ -144,7 +144,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
             repository,
             descriptorWithTree?.descriptors?.[0],
             {
-                ref: this.gitRef ?? `heads/${repository.default_branch}`
+                ref: this.gitRef
             }
         );
 

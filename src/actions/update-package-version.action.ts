@@ -100,7 +100,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                                 NpmUtil.PACKAGE_JSON_FILE_NAME,
                                 NpmUtil.LOCKFILE_FILE_NAME
                             ],
-                            this.gitRef ?? `heads/${repository.default_branch}`
+                            this.gitRef
                         );
 
                     if (descriptorWithTree?.descriptors.length !== 2) {
@@ -144,7 +144,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                             repoPath,
                             repository,
                             `Update ${this.packageName} to version ${this.packageVersion}`,
-                            this.gitRef ?? `heads/${repository.default_branch}`,
+                            this.gitRef,
                             descriptorWithTree,
                             {
                                 removeSubtrees: false, // set to false because we didnt obtain the tree recursively
@@ -252,7 +252,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     repository,
                     descriptor,
                     {
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.gitRef
                     }
                 );
                 descriptorWithContents.push({
