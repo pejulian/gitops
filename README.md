@@ -30,6 +30,18 @@ npx gitops update-package-version --help
 
 for more information.
 
+### `reinstall-package`
+
+This command allows you to reinstall an existing package in the effected repositories for the given organizations.
+
+Run:
+
+```bash
+npx gitops reinstall-package --help
+```
+
+for more information.
+
 ## Development
 
 If you cloned this repo and need to test the code locally, here's how:

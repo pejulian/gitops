@@ -253,11 +253,11 @@ npx gitops update-package-version
 program
     .command('reinstall-package')
     .summary(
-        `Reinstall an existing package in the effected repositories for the given organization`
+        `Reinstall an existing package in the effected repositories for the given organizations`
     )
     .usage(
         `
-Reinstall an existing package in the effected repositories for the given organization.
+Reinstall an existing package in the effected repositories for the given organizations.
 
 -o ORGANIZATIONS,..., n 
 -n PACKAGE_NAME
