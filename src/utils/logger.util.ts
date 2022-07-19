@@ -3,7 +3,7 @@ import lodash from 'lodash';
 import { Console } from 'console';
 import os from 'os';
 import fse from 'fs-extra';
-import { formatISO9075, formatISO } from 'date-fns';
+import { formatISO } from 'date-fns';
 
 const { compact, isEmpty } = lodash;
 
@@ -30,19 +30,21 @@ export class LoggerUtil {
 
         this._stdOutFile = `${os.homedir()}/${
             process.env.MODULE_NAME ?? 'gitops'
-        }-${
-            process.env.MODULE_VERSION ?? 'localhost'
-        }-${command}-${formatISO9075(new Date(), {
-            format: 'basic'
-        }).replace(' ', '')}-stdout.txt`;
+        }-${process.env.MODULE_VERSION ?? 'localhost'}-${command}-${formatISO(
+            new Date(),
+            {
+                format: 'basic'
+            }
+        )}-stdout.txt`;
 
         this._stdErrFile = `${os.homedir()}/${
             process.env.MODULE_NAME ?? 'gitops'
-        }-${
-            process.env.MODULE_VERSION ?? 'localhost'
-        }-${command}-${formatISO9075(new Date(), {
-            format: 'basic'
-        }).replace(' ', '')}-stderr.txt`;
+        }-${process.env.MODULE_VERSION ?? 'localhost'}-${command}-${formatISO(
+            new Date(),
+            {
+                format: 'basic'
+            }
+        )}-stderr.txt`;
 
         this._console = new Console({
             stdout: fse.createWriteStream(this._stdOutFile),

@@ -5,6 +5,12 @@ import { SemverUtil } from './semver.util';
 
 const { isObject, isArray, isEmpty, isString } = lodash;
 
+export enum PackageTypes {
+    d = 'devDependencies',
+    o = 'optionalDependencies',
+    s = 'dependencies'
+}
+
 export type PackageView = Readonly<{
     _id: string;
     _rev: string;
@@ -351,7 +357,7 @@ export class NpmUtil {
 
         if (!dependencies) {
             throw new Error(
-                `The specified package dependency type was not found in ${NpmUtil.PACKAGE_JSON_FILE_NAME}`
+                `The package ${packageName} was not found as a ${PackageTypes[packageType]} in ${NpmUtil.PACKAGE_JSON_FILE_NAME}`
             );
         }
 

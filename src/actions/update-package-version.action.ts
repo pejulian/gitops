@@ -6,7 +6,7 @@ import {
     GitTreeItem
 } from '../utils/github.util';
 import { LogLevel } from '../utils/logger.util';
-import { NpmUtil } from '../utils/npm.util';
+import { NpmUtil, PackageTypes } from '../utils/npm.util';
 import { GenericAction } from './generic.action';
 
 export type UpdatePackageVersionActionOptions =
@@ -338,7 +338,9 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             if (!theExistingVersion) {
                 this.logger.info(
                     `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
-                    `The npm package ${this.packageName} is not installed in ${repository.name}`
+                    `The package ${this.packageName} was not found in ${
+                        repository.name
+                    } in ${PackageTypes[this.packageType]}`
                 );
 
                 return undefined;
