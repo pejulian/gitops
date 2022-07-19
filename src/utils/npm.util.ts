@@ -11,6 +11,12 @@ export enum PackageTypes {
     s = 'dependencies'
 }
 
+export enum InstallModes {
+    o = '--save-optional',
+    d = '--save-dev',
+    s = '--save'
+}
+
 export type PackageView = Readonly<{
     _id: string;
     _rev: string;
@@ -79,6 +85,7 @@ export type PackageJson = Readonly<{
     scripts?: Record<string, string | undefined>;
     dependencies: Record<string, string | undefined>;
     devDependencies?: Record<string, string | undefined>;
+    optionalDependencies?: Record<string, string | undefined>;
     [key: string]: unknown;
 }>;
 
@@ -330,7 +337,9 @@ export class NpmUtil {
     }
 
     /**
-     * Returns the package version if it exists in package.json or undefined if it doesn't
+     * Returns the package version if it exists in package.json or undefined if it doesn't.
+     * Provide the checkAll option to search through all dependency types for this package name in the given package.json object.
+     *
      * @param packageJson The package.json file to work on
      * @param packageName The package name to search for
      * @param packageType The type of package this is
@@ -339,33 +348,79 @@ export class NpmUtil {
     public static doesDependencyExist(
         packageJson: Record<string, unknown>,
         packageName: string,
-        packageType: 'd' | 's' | 'o'
-    ): string | undefined {
+        packageType: 'd' | 's' | 'o',
+        options: Readonly<{
+            checkAll: boolean;
+        }> = {
+            checkAll: false
+        }
+    ): Readonly<{
+        versionFound: string | undefined;
+        packageType: 'd' | 's' | 'o';
+    }> {
         if (!NpmUtil.isPackageJson(packageJson)) {
             throw new Error(
                 `The given file content is not a valid ${NpmUtil.PACKAGE_JSON_FILE_NAME} file`
             );
         }
 
-        const dependencies = packageJson[
-            packageType === 'd'
-                ? 'devDependencies'
-                : packageType === 'o'
-                ? 'optionalDependencies'
-                : 'dependencies'
-        ] as Record<string, string>;
+        const { dependencies, devDependencies, optionalDependencies } =
+            packageJson;
 
-        if (!dependencies) {
-            throw new Error(
-                `The package ${packageName} was not found as a ${PackageTypes[packageType]} in ${NpmUtil.PACKAGE_JSON_FILE_NAME}`
-            );
+        const dependencyKeys = Object.keys(dependencies ?? {});
+        const devDependencyKeys = Object.keys(devDependencies ?? {});
+        const optionalDependencyKeys = Object.keys(optionalDependencies ?? {});
+
+        if (options.checkAll) {
+            if (dependencyKeys.includes(packageName)) {
+                return {
+                    packageType: 's',
+                    versionFound: dependencies?.[packageName]
+                };
+            } else if (devDependencyKeys.includes(packageName)) {
+                return {
+                    packageType: 'd',
+                    versionFound: devDependencies?.[packageName]
+                };
+            } else if (optionalDependencyKeys.includes(packageName)) {
+                return {
+                    packageType: 'o',
+                    versionFound: optionalDependencies?.[packageName]
+                };
+            } else {
+                throw new Error(
+                    `The package ${packageName} was not found in ${NpmUtil.PACKAGE_JSON_FILE_NAME}`
+                );
+            }
+        } else {
+            let objectToSearch: Record<string, string | undefined> | undefined;
+
+            switch (packageType) {
+                case 's':
+                    objectToSearch = dependencies;
+                    break;
+                case 'd':
+                    objectToSearch = devDependencies;
+                    break;
+                case 'o':
+                    objectToSearch = optionalDependencies;
+                    break;
+                default:
+                    objectToSearch = undefined;
+                    break;
+            }
+
+            if (!objectToSearch) {
+                throw new Error(
+                    `The package ${packageName} was not found as a ${PackageTypes[packageType]} in ${NpmUtil.PACKAGE_JSON_FILE_NAME}`
+                );
+            }
+
+            return {
+                packageType,
+                versionFound: objectToSearch[packageName]
+            };
         }
-
-        if (Object.keys(dependencies).includes(packageName)) {
-            return dependencies[packageName];
-        }
-
-        return undefined;
     }
 
     /**

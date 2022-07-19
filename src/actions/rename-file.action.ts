@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { GitToolkitCommands } from '../index';
+import { GitOpsCommands } from '../index';
 import {
     FilesystemUtil,
     FilesystemWriteFileOptions
@@ -11,7 +11,7 @@ import {
 import { LogLevel } from '../utils/logger.util';
 import { GenericAction } from './generic.action';
 
-export type RenameFileActionOptions = GitToolkitCommands['RenameFileAction'];
+export type RenameFileActionOptions = GitOpsCommands['RenameFileAction'];
 
 export type RenameFileActionResponse = void;
 
@@ -68,7 +68,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                 await this.githubUtil.findTreeAndDescriptorForFilePath(
                     repository,
                     [this.targetFilePath],
-                    this.gitRef,
+                    this.gitRef ?? `heads/${repository.default_branch}`,
                     true
                 );
 
@@ -144,7 +144,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
             repository,
             descriptorWithTree?.descriptors?.[0],
             {
-                ref: this.gitRef
+                ref: this.gitRef ?? `heads/${repository.default_branch}`
             }
         );
 

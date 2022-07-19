@@ -157,7 +157,7 @@ export class GithubUtil {
      */
     public async getRepositoryGitTree(
         repository: GitHubRepository,
-        ref = `heads/${repository.default_branch}`,
+        ref = `heads/master`,
         recursive?: boolean
     ): Promise<GitTree> {
         try {
@@ -532,7 +532,7 @@ export class GithubUtil {
         uploadDirPath: string,
         repository: GitHubRepository,
         commitMessage: string,
-        ref = `heads/${repository.default_branch}`,
+        ref = `heads/master`,
         fileDescriptorWithTree?: GitTreeWithFileDescriptor,
         options: Readonly<{
             removeSubtrees: boolean;
@@ -807,7 +807,10 @@ export class GithubUtil {
     public async getContent(
         repository: GitHubRepository,
         path: string,
-        options?: GetContentOptions
+        options: GetContentOptions = {
+            ref: `heads/master`,
+            encoding: 'utf8'
+        }
     ): Promise<string> {
         try {
             const response = await this.octokit.repos.getContent({
@@ -990,7 +993,7 @@ export class GithubUtil {
 
     public async setCommmitBranch(
         repository: GitHubRepository,
-        ref = `heads/${repository.default_branch}`,
+        ref = `heads/master`,
         commitSha: string
     ): Promise<GitReference> {
         try {

@@ -2,36 +2,46 @@ import { Command, Option } from 'commander';
 import { LogLevel } from './utils/logger.util';
 import { RenameFileAction } from './actions/rename-file.action';
 import { UpdatePackageVersionAction } from './actions/update-package-version.action';
+import { ReinstallPackageAction } from './actions/reinstall-package.action';
 
-export type GitToolkitCommands = {
+export type GitOpsCommands = {
     Common: Readonly<{
         organizations: Array<string>;
         githubToken?: string;
         tokenFilePath?: string;
         logLevel: string;
         ref?: string;
+        repositories?: string;
+    }>;
+    CommonPackageConstraints: Readonly<{
+        packageUpdateConstraint?: string;
+        packageUpdateCondition?: 'gte' | 'gt' | 'eq' | 'lte' | 'lt';
     }>;
     RenameFileAction: Readonly<{
         targetFilePath: string;
         newFileName: string;
-        repositories?: string;
     }> &
-        GitToolkitCommands['Common'];
+        GitOpsCommands['Common'];
     UpdatePackageVersion: Readonly<{
         packageName: string;
         packageVersion: string;
         packageType: 'd' | 's' | 'o';
-        packageUpdateConstraint?: string;
-        packageUpdateCondition?: 'gte' | 'gt' | 'eq' | 'lte' | 'lt';
-        repositories?: string;
     }> &
-        GitToolkitCommands['Common'];
+        GitOpsCommands['CommonPackageConstraints'] &
+        GitOpsCommands['Common'];
+    ReinstallPackage: Readonly<{
+        packageName: string;
+        packageVersion: string;
+        packageType: 'd' | 's' | 'o';
+    }> &
+        GitOpsCommands['CommonPackageConstraints'] &
+        GitOpsCommands['Common'];
     EnsureDeployability: Readonly<{
         runTest?: boolean;
         runBuild?: boolean;
         mandatoryFiles?: Array<string>;
     }> &
-        GitToolkitCommands['Common'];
+        GitOpsCommands['Common'];
 };
 
 const program = new Command();
@@ -107,12 +117,12 @@ const packageTypeOption = new Option(
 
 const packageUpdateConstraint = new Option(
     `--package-update-constraint <value>`,
-    `[OPTIONAL] This flag applies checks to the CURRENT VERSION OF THE PACKAGE INSTALLED. A valid semver string (e.g. 2.x.x) or distribution tag (e.g. latest, beta) to determines if the CURRENT PACKAGE VERSION meets the criteria to be updated (only works if an update condition has been specified via the --package-update-constraint flag)`
+    `[OPTIONAL] This flag applies checks to the CURRENT VERSION OF THE PACKAGE INSTALLED. A valid semver string (e.g. 2.x.x) or distribution tag (e.g. latest, beta) to determines if the CURRENT PACKAGE VERSION meets the criteria to be updated/reinstalled (only works if an update condition has been specified via the --package-update-constraint flag)`
 );
 
 const packageUpdateCondition = new Option(
     `--package-update-condition <value>`,
-    `[OPTIONAL] This flag applies checks to the CURRENT VERSION OF THE PACKAGE INSTALLED. Apply a package update condition on the CURRENT PACKAGE VERSION to determine if it satisfies the constraint supplied in --package-update-constraint`
+    `[OPTIONAL] This flag applies checks to the CURRENT VERSION OF THE PACKAGE INSTALLED. Apply a package update/reinstall condition on the CURRENT PACKAGE VERSION to determine if it satisfies the constraint supplied in --package-update-constraint`
 ).choices(['lt', 'lte', 'gt', 'gte', 'eq']);
 
 program
@@ -164,7 +174,7 @@ npx gitops rename-file
     .addOption(repositoriesOption)
     .addOption(targetFilePath)
     .addOption(newFileNameOption)
-    .action(async (options: GitToolkitCommands['RenameFileAction']) => {
+    .action(async (options: GitOpsCommands['RenameFileAction']) => {
         const action = new RenameFileAction(options);
         await action.run();
     });
@@ -235,8 +245,79 @@ npx gitops update-package-version
     .addOption(packageTypeOption)
     .addOption(packageUpdateCondition)
     .addOption(packageUpdateConstraint)
-    .action(async (options: GitToolkitCommands['UpdatePackageVersion']) => {
+    .action(async (options: GitOpsCommands['UpdatePackageVersion']) => {
         const action = new UpdatePackageVersionAction(options);
+        await action.run();
+    });
+
+program
+    .command('reinstall-package')
+    .summary(
+        `Reinstall an existing package in the effected repositories for the given organization`
+    )
+    .usage(
+        `
+Reinstall an existing package in the effected repositories for the given organization.
+
+-o ORGANIZATIONS,..., n 
+-n PACKAGE_NAME
+-v SEMVER 
+[   -p GITBUB_TOKEN_FILE_PATH 
+    -t GITHUB_TOKEN 
+    -l ERROR|WARN|INFO|DEBUG 
+    -f GIT_REF 
+    -r RegExp 
+    --package-update-constraint SEMVER 
+    --package-update-condition lte|lt|gte|gt|eq 
+]
+
+Examples:
+
+This command will reinstall the package "c9-cdk-nodejs" in all repositories for the GitHub organization named "c9" in "devDependencies" with the version "2.2.0" IF the existing version of "c9-cdk-nodejs" in each scanned repository has a version that is greater or equal to "2.0.0". The operation will use the default log level, INFO. The operation will run on the default branch of each repository scanned.
+
+npx gitops reinstall-package
+  -o c9
+  -n "c9-cdk-nodejs"
+  -v "2.2.0"
+  -y d
+  --package-update-constraint "2.0.0"
+  --package-update-condition gte
+
+This command will reinstall the package "c9-deploy" in the repository "c9-login-refresh" in the GitHub organization named "c9" in "devDependencies" (if it exists) with the latest version IF the existing version of "c9-deploy" in the scanned repository has a version that is less than or equal to "1.9.0". The operation will run with the log level of DEBUG. The operation will run on the "dev" branch of each repository scanned.
+
+npx gitops reinstall-package
+  -o c9
+  -l DEBUG
+  -r "c9-login-refresh"
+  -n "c9-deploy"
+  -f "heads/dev"
+  -v "latest"
+  -t d
+  --package-update-constraint "1.9.0"
+  --package-update-condition lte
+
+This command will reinstall the package "webpack" in all repositories in the GitHub organization named "c9" (if it exists) in "optionalDependencies" to the latest version. The operation will run using the default level and default branch of the repository scanned.
+
+npx gitops reinstall-package
+  -o c9
+  -n "webpack"
+  -v "latest"
+  -t o
+`
+    )
+    .addOption(tokenFilePathOption)
+    .addOption(githubTokenOption)
+    .addOption(logLevelOption)
+    .addOption(refOption)
+    .addOption(organizationsOption)
+    .addOption(repositoriesOption)
+    .addOption(packageNameOption)
+    .addOption(packageVersionOption)
+    .addOption(packageTypeOption)
+    .addOption(packageUpdateCondition)
+    .addOption(packageUpdateConstraint)
+    .action(async (options: GitOpsCommands['ReinstallPackage']) => {
+        const action = new ReinstallPackageAction(options);
         await action.run();
     });
 
