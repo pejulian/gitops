@@ -353,6 +353,17 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                 return undefined;
             }
 
+            if (theExistingPackageType === this.packageType) {
+                this.logger.info(
+                    `[${ReinstallPackageAction.CLASS_NAME}.reinstallPackageForProject]`,
+                    `The package ${this.packageName} is already installed in ${
+                        PackageTypes[this.packageType]
+                    } for ${repository.name}`
+                );
+
+                return undefined;
+            }
+
             // Remove any prepare scripts that might mess up this limited checkout and install
             const { packageJson, prepareScript } =
                 this.npmUtil.removePrepareScript(maybePackageJson, {
