@@ -15,12 +15,6 @@ export type UpdatePackageVersionActionOptions =
 export type UpdatePackageVersionActionResponse = void;
 
 export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersionActionResponse> {
-    private static readonly CLASS_NAME = 'UpdatePackageVersionAction';
-
-    private organizations: Array<string>;
-    private repositories: string | undefined;
-    private gitRef: string | undefined;
-
     private packageName: string;
     private packageVersion: string;
     private packageType: UpdatePackageVersionActionOptions['packageType'];
@@ -28,16 +22,18 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
     private packageUpdateCondition: UpdatePackageVersionActionOptions['packageUpdateCondition'];
 
     constructor(options: UpdatePackageVersionActionOptions) {
+        UpdatePackageVersionAction.CLASS_NAME = 'UpdatePackageVersionAction';
+
         super({
             githubToken: options.githubToken,
             logLevel: LogLevel[options.logLevel as keyof typeof LogLevel],
             tokenFilePath: options.tokenFilePath,
-            command: UpdatePackageVersionAction.CLASS_NAME
+            command: UpdatePackageVersionAction.CLASS_NAME,
+            organizations: options.organizations,
+            repositories: options.repositories,
+            excludeRepositories: options.excludeRepositories,
+            gitRef: options.ref
         });
-
-        this.organizations = options.organizations;
-        this.repositories = options.repositories;
-        this.gitRef = options.ref;
 
         this.packageName = options.packageName;
         this.packageVersion = options.packageVersion;
@@ -183,47 +179,6 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             }\n`,
             `View full error log at ${this.logger.getLogFilePaths().errorLog}`
         );
-    }
-
-    /**
-     * Obtains a list of repositories on which the given action should be applied on based on the provided criteria
-     * @returns A list of organization repositories to apply this action on
-     */
-    public async listApplicableRepositoriesForOperation(
-        organization: string
-    ): Promise<Array<GitHubRepository>> {
-        let repositories: Array<GitHubRepository> = [];
-
-        try {
-            repositories =
-                await this.githubUtil.listRepositoriesForOrganization(
-                    organization,
-                    {
-                        onlyInclude: this.repositories
-                    }
-                );
-
-            this.logger.debug(
-                `[${UpdatePackageVersionAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
-                `Matched ${
-                    repositories.length
-                } repositories for ${organization}:\n${repositories
-                    .map((repository, index) => {
-                        return `[${index + 1}] ${repository.name} [${
-                            this.gitRef ?? `heads/${repository.default_branch}`
-                        }]\n`;
-                    })
-                    .join('')}`
-            );
-        } catch (e) {
-            this.logger.warn(
-                `[${UpdatePackageVersionAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
-                `Error getting repositories for ${organization}. Operation will skip this organization.\n`,
-                e
-            );
-        }
-
-        return repositories;
     }
 
     public async updatePackageVersionForProject(

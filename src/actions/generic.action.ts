@@ -1,5 +1,5 @@
 import { FilesystemUtil } from '../utils/filesystem.util';
-import { GithubUtil } from '../utils/github.util';
+import { GitHubRepository, GithubUtil } from '../utils/github.util';
 import { LoggerUtil, LogLevel } from '../utils/logger.util';
 import { NpmUtil } from '../utils/npm.util';
 import { ProcessorUtil } from '../utils/processsor.util';
@@ -30,15 +30,38 @@ export type GenericActionOptions = Readonly<{
      * The command that this tool was invoked with
      */
     command: string;
+    /**
+     * The list of organizations to work on
+     */
+    organizations: Array<string>;
+    /**
+     * A regex of repos to consider for operations
+     */
+    repositories?: string;
+    /**
+     * A list of repositories to be excluded from consideration
+     */
+    excludeRepositories?: Array<string>;
+    /**
+     * The git reference to operate on for each repository
+     */
+    gitRef?: string;
 }>;
 
 export abstract class GenericAction<T> implements IGenericAction<T> {
+    protected static CLASS_NAME = 'GenericAction';
+
     protected readonly logger: LoggerUtil;
     protected readonly githubUtil: GithubUtil;
     protected readonly filesystemUtil: FilesystemUtil;
     protected readonly processorUtil: ProcessorUtil;
     protected readonly semverUtil: SemverUtil;
     protected readonly npmUtil: NpmUtil;
+
+    protected organizations: Array<string>;
+    protected repositories: string | undefined;
+    protected excludeRepositories: Array<string> | undefined;
+    protected gitRef: string | undefined;
 
     constructor(options: GenericActionOptions) {
         const logLevel = options.logLevel ?? LogLevel.ERROR;
@@ -69,9 +92,56 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
             logger: this.logger,
             filesystemUtils: this.filesystemUtil
         });
+
+        this.excludeRepositories = options.excludeRepositories;
+        this.repositories = options.repositories;
+        this.organizations = options.organizations;
+        this.gitRef = options.gitRef;
     }
 
     public async run(): Promise<T> {
         throw new Error('Method not implemented.');
+    }
+
+    /**
+     * Obtains a list of repositories on which the given action should be applied on based on the provided criteria
+     * @returns A list of organization repositories to apply this action on
+     */
+    protected async listApplicableRepositoriesForOperation(
+        organization: string
+    ): Promise<Array<GitHubRepository>> {
+        let repositories: Array<GitHubRepository> = [];
+
+        try {
+            repositories =
+                await this.githubUtil.listRepositoriesForOrganization(
+                    organization,
+                    {
+                        onlyInclude: this.repositories,
+                        excludeRepositories: this.excludeRepositories
+                    }
+                );
+
+            this.logger.debug(
+                `[${GenericAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
+                `Matched ${
+                    repositories.length
+                } repositories for ${organization}:\n${repositories
+                    .map((repository, index) => {
+                        return `[${index + 1}] ${repository.name} [${
+                            this.gitRef ?? `heads/${repository.default_branch}`
+                        }]\n`;
+                    })
+                    .join('')}`
+            );
+        } catch (e) {
+            this.logger.warn(
+                `[${GenericAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
+                `Error getting repositories for ${organization}. Operation will skip this organization.\n`,
+                e
+            );
+        }
+
+        return repositories;
     }
 }

@@ -16,26 +16,26 @@ export type RenameFileActionOptions = GitOpsCommands['RenameFileAction'];
 export type RenameFileActionResponse = void;
 
 export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
-    private static readonly CLASS_NAME = 'RenameFileAction';
-
-    private organizations: Array<string>;
-    private repositories: string | undefined;
     private targetFilePath: string;
     private newFileName: string;
-    private gitRef: string | undefined;
 
     constructor(options: RenameFileActionOptions) {
+        RenameFileAction.CLASS_NAME = 'RenameFileAction';
+
         super({
             githubToken: options.githubToken,
             logLevel: LogLevel[options.logLevel as keyof typeof LogLevel],
             tokenFilePath: options.tokenFilePath,
-            command: RenameFileAction.CLASS_NAME
+            command: RenameFileAction.CLASS_NAME,
+            organizations: options.organizations,
+            excludeRepositories: options.excludeRepositories,
+            repositories: options.repositories,
+            gitRef: options.ref
         });
 
-        this.organizations = options.organizations;
-        this.repositories = options.repositories;
         this.targetFilePath = options.targetFilePath;
         this.newFileName = options.newFileName;
+        this.excludeRepositories = options.excludeRepositories;
         this.gitRef = options.ref;
     }
 
@@ -51,41 +51,56 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                 .map((organization, index) => {
                     return `[${index + 1}] ${organization}\n`;
                 })
-                .join('')}\n`
+                .join('')}`
         );
 
-        const repositories =
-            await this.listApplicableRepositoriesForOperation();
+        for await (const organization of this.organizations) {
+            const repositories =
+                await this.listApplicableRepositoriesForOperation(organization);
 
-        for await (const repository of repositories) {
-            // When every loop starts, ensure that all previous terms are cleared
-            this.logger.clearTermsFromLogPrefix();
+            for await (const repository of repositories) {
+                // When every loop starts, ensure that all previous terms are cleared
+                this.logger.clearTermsFromLogPrefix();
 
-            // Append the organization and repo name
-            this.logger.appendTermToLogPrefix(repository.full_name);
+                // Append the organization and repo name
+                this.logger.appendTermToLogPrefix(repository.full_name);
 
-            const descriptorWithTree =
-                await this.githubUtil.findTreeAndDescriptorForFilePath(
-                    repository,
-                    [this.targetFilePath],
-                    this.gitRef ?? `heads/${repository.default_branch}`,
-                    true
-                );
+                const descriptorWithTree =
+                    await this.githubUtil.findTreeAndDescriptorForFilePath(
+                        repository,
+                        [this.targetFilePath],
+                        this.gitRef ?? `heads/${repository.default_branch}`,
+                        true
+                    );
 
-            if (!descriptorWithTree?.descriptors?.[0]) {
-                this.logger.warn(
-                    `[${RenameFileAction.CLASS_NAME}.run]`,
-                    `The target file path ${
-                        this.targetFilePath
-                    } was not found in ${repository.name} <${
-                        this.gitRef ?? `heads/${repository.default_branch}`
-                    }>`
-                );
+                if (!descriptorWithTree?.descriptors?.[0]) {
+                    this.logger.warn(
+                        `[${RenameFileAction.CLASS_NAME}.run]`,
+                        `The target file path ${
+                            this.targetFilePath
+                        } was not found in ${repository.name} <${
+                            this.gitRef ?? `heads/${repository.default_branch}`
+                        }>`
+                    );
 
-                continue;
+                    continue;
+                }
+
+                try {
+                    await this.writeFileWithNewName(
+                        repository,
+                        descriptorWithTree
+                    );
+                } catch (e) {
+                    this.logger.error(
+                        `[${RenameFileAction.CLASS_NAME}.run]`,
+                        `Internal error while running rename for the file ${this.targetFilePath} in ${repository.name}.\n`,
+                        e
+                    );
+
+                    continue;
+                }
             }
-
-            await this.writeFileWithNewName(repository, descriptorWithTree);
         }
 
         this.logger.info(
@@ -96,43 +111,6 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
             }\n`,
             `View full error log at ${this.logger.getLogFilePaths().errorLog}`
         );
-    }
-
-    /**
-     * Obtains a list of repositories on which the given action should be applied on based on the provided criteria
-     * @returns A list of organization repositories to apply this action on
-     */
-    public async listApplicableRepositoriesForOperation(): Promise<
-        Array<GitHubRepository>
-    > {
-        let allRepositories: Array<GitHubRepository> = [];
-
-        for await (const organization of this.organizations) {
-            const repositories =
-                await this.githubUtil.listRepositoriesForOrganization(
-                    organization,
-                    {
-                        onlyInclude: this.repositories
-                    }
-                );
-
-            this.logger.debug(
-                `[${RenameFileAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
-                `Matched ${
-                    repositories.length
-                } repositories for ${organization}:\n${repositories
-                    .map((repository, index) => {
-                        return `[${index + 1}] ${repository.name} [${
-                            this.gitRef ?? `heads/${repository.default_branch}`
-                        }]\n`;
-                    })
-                    .join('')}\n`
-            );
-
-            allRepositories = [...allRepositories, ...repositories];
-        }
-
-        return allRepositories;
     }
 
     public async writeFileWithNewName(

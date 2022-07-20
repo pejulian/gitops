@@ -103,11 +103,13 @@ export class GithubUtil {
                 includeArchived: boolean;
                 includeDisabled: boolean;
                 onlyInclude: string;
+                excludeRepositories: Array<string>;
             }>
         > = {
             includeForks: false,
             includeArchived: false,
-            includeDisabled: false
+            includeDisabled: false,
+            excludeRepositories: []
         }
     ): Promise<Array<GitHubRepository>> {
         const repositories: Array<GitHubRepository> = [];
@@ -126,6 +128,16 @@ export class GithubUtil {
                         (options.includeArchived || !repository.archived) &&
                         (options.includeDisabled || !repository.disabled)
                     ) {
+                        // Do not include if repository should be excluded
+                        if (
+                            options.excludeRepositories?.includes(
+                                repository.name
+                            )
+                        ) {
+                            return;
+                        }
+
+                        // If onlyInclude is defined, check if the criteria is met before including the repository
                         if (options.onlyInclude) {
                             const exp = new RegExp(options.onlyInclude);
                             if (!exp.test(repository.name)) {

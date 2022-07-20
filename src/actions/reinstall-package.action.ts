@@ -14,12 +14,6 @@ export type ReinstallPackageActionOptions = GitOpsCommands['ReinstallPackage'];
 export type ReinstallPackageActionResponse = void;
 
 export class ReinstallPackageAction extends GenericAction<ReinstallPackageActionResponse> {
-    private static readonly CLASS_NAME = 'ReinstallPackageAction';
-
-    private organizations: Array<string>;
-    private repositories: string | undefined;
-    private gitRef: string | undefined;
-
     private packageName: string;
     private packageVersion: string;
     private packageType: ReinstallPackageActionOptions['packageType'];
@@ -27,16 +21,18 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
     private packageUpdateCondition: ReinstallPackageActionOptions['packageUpdateCondition'];
 
     constructor(options: ReinstallPackageActionOptions) {
+        ReinstallPackageAction.CLASS_NAME = 'ReinstallPackageAction';
+
         super({
             githubToken: options.githubToken,
             logLevel: LogLevel[options.logLevel as keyof typeof LogLevel],
             tokenFilePath: options.tokenFilePath,
-            command: ReinstallPackageAction.CLASS_NAME
+            command: ReinstallPackageAction.CLASS_NAME,
+            organizations: options.organizations,
+            excludeRepositories: options.excludeRepositories,
+            repositories: options.repositories,
+            gitRef: options.ref
         });
-
-        this.organizations = options.organizations;
-        this.repositories = options.repositories;
-        this.gitRef = options.ref;
 
         this.packageName = options.packageName;
         this.packageVersion = options.packageVersion;
@@ -76,6 +72,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                 return;
             }
 
+            // Run for every given organization
             for await (const organization of this.organizations) {
                 const tmpDir =
                     this.filesystemUtil.createSubdirectoryAtProjectRoot();
@@ -85,6 +82,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                         organization
                     );
 
+                // Run for every fetched repository in the organization
                 for await (const repository of repositories) {
                     // When every loop starts, ensure that all previous terms are cleared
                     this.logger.clearTermsFromLogPrefix();
@@ -184,47 +182,6 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
             }\n`,
             `View full error log at ${this.logger.getLogFilePaths().errorLog}`
         );
-    }
-
-    /**
-     * Obtains a list of repositories on which the given action should be applied on based on the provided criteria
-     * @returns A list of organization repositories to apply this action on
-     */
-    public async listApplicableRepositoriesForOperation(
-        organization: string
-    ): Promise<Array<GitHubRepository>> {
-        let repositories: Array<GitHubRepository> = [];
-
-        try {
-            repositories =
-                await this.githubUtil.listRepositoriesForOrganization(
-                    organization,
-                    {
-                        onlyInclude: this.repositories
-                    }
-                );
-
-            this.logger.debug(
-                `[${ReinstallPackageAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
-                `Matched ${
-                    repositories.length
-                } repositories for ${organization}:\n${repositories
-                    .map((repository, index) => {
-                        return `[${index + 1}] ${repository.name} [${
-                            this.gitRef ?? `heads/${repository.default_branch}`
-                        }]\n`;
-                    })
-                    .join('')}`
-            );
-        } catch (e) {
-            this.logger.warn(
-                `[${ReinstallPackageAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
-                `Error getting repositories for ${organization}. Operation will skip this organization.\n`,
-                e
-            );
-        }
-
-        return repositories;
     }
 
     public async reinstallPackageForProject(

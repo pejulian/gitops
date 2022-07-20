@@ -12,6 +12,7 @@ export type GitOpsCommands = {
         logLevel: string;
         ref?: string;
         repositories?: string;
+        excludeRepositories?: Array<string>;
     }>;
     CommonPackageConstraints: Readonly<{
         packageUpdateConstraint?: string;
@@ -86,6 +87,11 @@ const refOption = new Option(
 const repositoriesOption = new Option(
     '-r, --repositories <value>',
     'A regex string to match repositories in the organization to apply the action on.'
+);
+
+const excludeRepositoriesOption = new Option(
+    '-e, --exclude-repositories [value...]',
+    'A list of repositories to be excluded when a command is run on an organization.'
 );
 
 const targetFilePath = new Option(
@@ -172,6 +178,7 @@ npx gitops rename-file
     .addOption(refOption)
     .addOption(organizationsOption)
     .addOption(repositoriesOption)
+    .addOption(excludeRepositoriesOption)
     .addOption(targetFilePath)
     .addOption(newFileNameOption)
     .action(async (options: GitOpsCommands['RenameFileAction']) => {
