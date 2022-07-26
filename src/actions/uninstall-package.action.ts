@@ -1,28 +1,26 @@
-import _ from 'lodash';
 import { GitOpsCommands } from '../index';
 import {
-    GitTreeWithFileDescriptor,
     GitHubRepository,
-    GitTreeItem
+    GitTreeItem,
+    GitTreeWithFileDescriptor
 } from '../utils/github.util';
 import { LogLevel } from '../utils/logger.util';
 import { InstallModes, NpmUtil, PackageTypes } from '../utils/npm.util';
 import { GenericAction } from './generic.action';
+import _ from 'lodash';
 
-export type UpdatePackageVersionActionOptions =
-    GitOpsCommands['UpdatePackageVersion'];
+export type UninstallPackageActionOptions = GitOpsCommands['UninstallPackage'];
 
-export type UpdatePackageVersionActionResponse = void;
+export type UninstallPackageActionResponse = void;
 
-export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersionActionResponse> {
+export class UninstallPackageAction extends GenericAction<UninstallPackageActionResponse> {
     private packageName: string;
-    private packageVersion: string;
-    private packageType: UpdatePackageVersionActionOptions['packageType'];
-    private packageUpdateConstraint: UpdatePackageVersionActionOptions['packageUpdateConstraint'];
-    private packageUpdateCondition: UpdatePackageVersionActionOptions['packageUpdateCondition'];
+    private packageType: UninstallPackageActionOptions['packageType'];
+    private packageUpdateConstraint: UninstallPackageActionOptions['packageUpdateConstraint'];
+    private packageUpdateCondition: UninstallPackageActionOptions['packageUpdateCondition'];
 
-    constructor(options: UpdatePackageVersionActionOptions) {
-        UpdatePackageVersionAction.CLASS_NAME = 'UpdatePackageVersionAction';
+    constructor(options: UninstallPackageActionOptions) {
+        UninstallPackageAction.CLASS_NAME = 'UninstallPackageAction';
 
         super({
             githubToken: options.githubToken,
@@ -30,27 +28,26 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             tokenFilePath: options.tokenFilePath,
             organizations: options.organizations,
             repositoryList: options.repositoryList,
-            repositories: options.repositories,
             excludeRepositories: options.excludeRepositories,
+            repositories: options.repositories,
             gitRef: options.ref,
-            command: UpdatePackageVersionAction.CLASS_NAME
+            command: UninstallPackageAction.CLASS_NAME
         });
 
         this.packageName = options.packageName;
-        this.packageVersion = options.packageVersion;
         this.packageType = options.packageType;
         this.packageUpdateConstraint = options.packageUpdateConstraint;
         this.packageUpdateCondition = options.packageUpdateCondition;
     }
 
-    public async run(): Promise<UpdatePackageVersionActionResponse> {
+    public async run(): Promise<UninstallPackageActionResponse> {
         this.logger.info(
-            `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-            `Updating ${this.packageName} to version ${this.packageVersion}`
+            `[${UninstallPackageAction.CLASS_NAME}.run]`,
+            `Uninstalling ${this.packageName}`
         );
 
         this.logger.debug(
-            `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+            `[${UninstallPackageAction.CLASS_NAME}.run]`,
             `Git organizations to work on are:\n${this.organizations
                 .map((organization, index) => {
                     return `[${index + 1}] ${organization}\n`;
@@ -59,21 +56,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
         );
 
         try {
-            // Determine if the package version that we are trying to update to exists
-            const versionToUse = await this.npmUtil.doesPackageVersionExist(
-                this.packageName,
-                this.packageVersion
-            );
-
-            // If no such version for the package exists, then we stop processing here
-            if (!versionToUse) {
-                this.logger.info(
-                    `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-                    `The specified version ${this.packageVersion} does not exist for the package ${this.packageName}`
-                );
-                return;
-            }
-
+            // Run for every given organization
             for await (const organization of this.organizations) {
                 const tmpDir =
                     this.filesystemUtil.createSubdirectoryAtProjectRoot();
@@ -83,6 +66,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                         organization
                     );
 
+                // Run for every fetched repository in the organization
                 for await (const repository of repositories) {
                     // When every loop starts, ensure that all previous terms are cleared
                     this.logger.clearTermsFromLogPrefix();
@@ -102,7 +86,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
 
                     if (descriptorWithTree?.descriptors.length !== 2) {
                         this.logger.warn(
-                            `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+                            `[${UninstallPackageAction.CLASS_NAME}.run]`,
                             `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${
                                 NpmUtil.LOCKFILE_FILE_NAME
                             } was not found in ${repository.name} <${
@@ -114,11 +98,10 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                         continue;
                     }
 
-                    const repoPath = await this.updatePackageVersionForProject(
+                    const repoPath = await this.uninstallPackageForProject(
                         repository,
                         descriptorWithTree.descriptors,
-                        tmpDir,
-                        versionToUse
+                        tmpDir
                     );
 
                     // If no repo path is returned, something wrong happened and we should skip...
@@ -140,7 +123,9 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                         await this.githubUtil.uploadToRepository(
                             repoPath,
                             repository,
-                            `Update ${this.packageName} to version ${this.packageVersion}`,
+                            `Uninstall ${this.packageName} from ${
+                                PackageTypes[this.packageType]
+                            }`,
                             this.gitRef ?? `heads/${repository.default_branch}`,
                             descriptorWithTree,
                             {
@@ -153,7 +138,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                         );
                     } catch (e) {
                         this.logger.warn(
-                            `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+                            `[${UninstallPackageAction.CLASS_NAME}.run]`,
                             `Failed to upload changes\n`,
                             e
                         );
@@ -166,14 +151,14 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             }
         } catch (e) {
             this.logger.error(
-                `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+                `[${UninstallPackageAction.CLASS_NAME}.run]`,
                 `Internal error while running the operation.\n`,
                 e
             );
         }
 
         this.logger.info(
-            `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+            `[${UninstallPackageAction.CLASS_NAME}.run]`,
             `Operation completed.\n`,
             `View full output log at ${
                 this.logger.getLogFilePaths().outputLog
@@ -182,11 +167,10 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
         );
     }
 
-    public async updatePackageVersionForProject(
+    public async uninstallPackageForProject(
         repository: GitHubRepository,
         descriptors: GitTreeWithFileDescriptor['descriptors'],
-        tmpDir: string,
-        versionToUse: string
+        tmpDir: string
     ): Promise<string | undefined> {
         const orgPath = this.filesystemUtil.createFolder(
             `${tmpDir}/${repository.owner.login}`
@@ -218,7 +202,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             }
         } catch (e) {
             this.logger.error(
-                `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
+                `[${UninstallPackageAction.CLASS_NAME}.uninstallPackageForProject]`,
                 `Failed to obtain file contents for descriptors\n`,
                 e
             );
@@ -238,7 +222,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             );
         } catch (e) {
             this.logger.error(
-                `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
+                `[${UninstallPackageAction.CLASS_NAME}.uninstallPackageForProject]`,
                 `Failed to read ${NpmUtil.LOCKFILE_FILE_NAME} descriptor\n`,
                 e
             );
@@ -257,7 +241,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             );
         } catch (e) {
             this.logger.error(
-                `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
+                `[${UninstallPackageAction.CLASS_NAME}.uninstallPackageForProject]`,
                 `Failed to read ${NpmUtil.PACKAGE_JSON_FILE_NAME} descriptor`
             );
             throw e;
@@ -265,7 +249,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
 
         if (!lockfileDescriptorAndContent || !packageJsonDescriptorAndContent) {
             this.logger.error(
-                `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
+                `[${UninstallPackageAction.CLASS_NAME}.uninstallPackageForProject]`,
                 `Failed to resolve content for ${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME}`
             );
 
@@ -285,16 +269,21 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 packageJsonDescriptorAndContent.content
             );
 
-            const { versionFound: theExistingVersion } =
-                NpmUtil.doesDependencyExist(
-                    maybePackageJson,
-                    this.packageName,
-                    this.packageType
-                );
+            const {
+                packageType: theExistingPackageType,
+                versionFound: theExistingVersion
+            } = NpmUtil.doesDependencyExist(
+                maybePackageJson,
+                this.packageName,
+                this.packageType,
+                {
+                    checkAll: true
+                }
+            );
 
             if (!theExistingVersion) {
                 this.logger.info(
-                    `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
+                    `[${UninstallPackageAction.CLASS_NAME}.uninstallPackageForProject]`,
                     `The package ${this.packageName} was not found in ${
                         repository.name
                     } in ${PackageTypes[this.packageType]}`
@@ -311,10 +300,10 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     }
                 });
 
-            // Now we will consider any constraints and conditions that are specified before proceeding with the update
-            // If no constraint or condition is given, we will assume that any version given is good and will proceed with the update
+            // Now we will consider any constraints and conditions that are specified before proceeding with the uninstallation
+            // If no constraint or condition is given, we will assume that any version given is good and will proceed with the uninstallation
             // If provided, we will first ensure that the existing package meets the given constraints and conditions before proceeeding
-            // with the update.
+            // with the uninstallation.
             if (
                 !(await this.npmUtil.shouldUpdatePackageVersion(
                     this.packageName,
@@ -324,8 +313,8 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 ))
             ) {
                 this.logger.info(
-                    `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-                    `The update constraint was not fulfilled, update will be skipped`
+                    `[${UninstallPackageAction.CLASS_NAME}.uninstallPackageForProject]`,
+                    `The update constraint was not fulfilled, package uninstall will be skipped`
                 );
 
                 return undefined;
@@ -339,41 +328,24 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 }
             );
 
-            const npmCiResponse = await this.processorUtil.spawnProcess(
-                `npm`,
-                ['ci'],
-                {
-                    cwd: repoPath
-                }
-            );
-
-            if (npmCiResponse.code !== 0) {
-                this.logger.error(
-                    `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
-                    `The command ${npmCiResponse.command} failed to execute\n`,
-                    npmCiResponse.response
+            const uninstallExistingPackageResponse =
+                await this.processorUtil.spawnProcess(
+                    `npm`,
+                    [
+                        'uninstall',
+                        `${this.packageName}`,
+                        `${InstallModes[theExistingPackageType]}`
+                    ],
+                    {
+                        cwd: repoPath
+                    }
                 );
 
-                return undefined;
-            }
-
-            const updatePackageResponse = await this.processorUtil.spawnProcess(
-                `npm`,
-                [
-                    'install',
-                    `${this.packageName}@${versionToUse}`,
-                    `${InstallModes[this.packageType]}`
-                ],
-                {
-                    cwd: repoPath
-                }
-            );
-
-            if (updatePackageResponse.code !== 0) {
+            if (uninstallExistingPackageResponse.code !== 0) {
                 this.logger.error(
-                    `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
-                    `The command ${updatePackageResponse.command} failed to execute\n`,
-                    updatePackageResponse.response
+                    `[${UninstallPackageAction.CLASS_NAME}.uninstallPackageForProject]`,
+                    `The command ${uninstallExistingPackageResponse.command} failed to execute\n`,
+                    uninstallExistingPackageResponse.response
                 );
 
                 return undefined;
@@ -405,8 +377,8 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             return repoPath;
         } catch (e) {
             this.logger.error(
-                `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
-                `The package update for ${this.packageName} failed\n`,
+                `[${UninstallPackageAction.CLASS_NAME}.uninstallPackageForProject]`,
+                `The package uninstallation for ${this.packageName} failed\n`,
                 e
             );
 

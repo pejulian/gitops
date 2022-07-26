@@ -26,11 +26,12 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
             githubToken: options.githubToken,
             logLevel: LogLevel[options.logLevel as keyof typeof LogLevel],
             tokenFilePath: options.tokenFilePath,
-            command: RenameFileAction.CLASS_NAME,
             organizations: options.organizations,
+            repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
             repositories: options.repositories,
-            gitRef: options.ref
+            gitRef: options.ref,
+            command: RenameFileAction.CLASS_NAME
         });
 
         this.targetFilePath = options.targetFilePath;
@@ -39,7 +40,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
         this.gitRef = options.ref;
     }
 
-    public async run(): Promise<void> {
+    public async run(): Promise<RenameFileActionResponse> {
         this.logger.info(
             `[${RenameFileAction.CLASS_NAME}.run]`,
             `Renaming ${this.targetFilePath} to ${this.newFileName} in ${this.organizations.length} organization(s)`

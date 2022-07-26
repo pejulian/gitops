@@ -4,7 +4,7 @@
     "type": "module",
     "author": "Julian Pereira",
     "license": "ISC",
-    "version": "0.0.13",
+    "version": "0.0.18",
     "engines": {
         "node": ">=16",
         "npm": ">=8"

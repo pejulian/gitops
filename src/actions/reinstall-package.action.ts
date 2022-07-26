@@ -27,11 +27,12 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
             githubToken: options.githubToken,
             logLevel: LogLevel[options.logLevel as keyof typeof LogLevel],
             tokenFilePath: options.tokenFilePath,
-            command: ReinstallPackageAction.CLASS_NAME,
             organizations: options.organizations,
+            repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
             repositories: options.repositories,
-            gitRef: options.ref
+            gitRef: options.ref,
+            command: ReinstallPackageAction.CLASS_NAME
         });
 
         this.packageName = options.packageName;
@@ -41,7 +42,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
         this.packageUpdateCondition = options.packageUpdateCondition;
     }
 
-    public async run(): Promise<void> {
+    public async run(): Promise<ReinstallPackageActionResponse> {
         this.logger.info(
             `[${ReinstallPackageAction.CLASS_NAME}.run]`,
             `Reinstalling ${this.packageName} to version ${this.packageVersion}`

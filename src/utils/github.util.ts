@@ -104,6 +104,7 @@ export class GithubUtil {
                 includeDisabled: boolean;
                 onlyInclude: string;
                 excludeRepositories: Array<string>;
+                onlyFromList: Array<string>;
             }>
         > = {
             includeForks: false,
@@ -128,7 +129,8 @@ export class GithubUtil {
                         (options.includeArchived || !repository.archived) &&
                         (options.includeDisabled || !repository.disabled)
                     ) {
-                        // Do not include if repository should be excluded
+                        // Do not include if repository should be excluded (this is the -e flag)
+                        // Overrides onlyFromList (-i) and onlyInclude (-r)
                         if (
                             options.excludeRepositories?.includes(
                                 repository.name
@@ -137,8 +139,21 @@ export class GithubUtil {
                             return;
                         }
 
-                        // If onlyInclude is defined, check if the criteria is met before including the repository
-                        if (options.onlyInclude) {
+                        // The (-i) flag. Overrides the (-r) flag even if it is defined
+                        if (options.onlyFromList) {
+                            if (
+                                !options.onlyFromList.includes(repository.name)
+                            ) {
+                                return;
+                            }
+                        }
+
+                        // If onlyInclude is defined AND onlyFromList is not, check if the criteria is met before including the repository
+                        // NOTE: Only works if (-i) is not defined
+                        if (
+                            options.onlyInclude &&
+                            typeof options.onlyFromList === 'undefined'
+                        ) {
                             const exp = new RegExp(options.onlyInclude);
                             if (!exp.test(repository.name)) {
                                 return;

@@ -27,10 +27,6 @@ export type GenericActionOptions = Readonly<{
      */
     tokenFilePath?: string;
     /**
-     * The command that this tool was invoked with
-     */
-    command: string;
-    /**
      * The list of organizations to work on
      */
     organizations: Array<string>;
@@ -39,6 +35,10 @@ export type GenericActionOptions = Readonly<{
      */
     repositories?: string;
     /**
+     * A list of repositories to consider (overrides repositories)
+     */
+    repositoryList?: Array<string>;
+    /**
      * A list of repositories to be excluded from consideration
      */
     excludeRepositories?: Array<string>;
@@ -46,6 +46,10 @@ export type GenericActionOptions = Readonly<{
      * The git reference to operate on for each repository
      */
     gitRef?: string;
+    /**
+     * The command name being executed
+     */
+    command: string;
 }>;
 
 export abstract class GenericAction<T> implements IGenericAction<T> {
@@ -61,9 +65,12 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
     protected organizations: Array<string>;
     protected repositories: string | undefined;
     protected excludeRepositories: Array<string> | undefined;
+    protected repositoryList: Array<string> | undefined;
     protected gitRef: string | undefined;
 
     constructor(options: GenericActionOptions) {
+        GenericAction.CLASS_NAME = options.command;
+
         const logLevel = options.logLevel ?? LogLevel.ERROR;
 
         this.logger = new LoggerUtil(logLevel, options.command);
@@ -95,6 +102,7 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
 
         this.excludeRepositories = options.excludeRepositories;
         this.repositories = options.repositories;
+        this.repositoryList = options.repositoryList;
         this.organizations = options.organizations;
         this.gitRef = options.gitRef;
     }
@@ -118,7 +126,8 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
                     organization,
                     {
                         onlyInclude: this.repositories,
-                        excludeRepositories: this.excludeRepositories
+                        excludeRepositories: this.excludeRepositories,
+                        onlyFromList: this.repositoryList
                     }
                 );
 
