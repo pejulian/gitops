@@ -41,7 +41,7 @@
         "prepare": "husky install",
         "publish:latest": "npm publish --tag latest",
         "publish:beta": "npm publish --tag beta",
-        "versions:list": "npm view c9-js-logger --json"
+        "versions:list": "npm view gitops --json"
     },
     "lint-staged": {
         "*.{ts,js}": [
