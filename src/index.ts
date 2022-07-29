@@ -16,7 +16,7 @@ export type GitOpsCommands = {
         packageUpdateConstraint?: string;
         packageUpdateCondition?: 'gte' | 'gt' | 'eq' | 'lte' | 'lt';
     }>;
-    RenameFileAction: Readonly<{
+    RenameFile: Readonly<{
         targetFilePath: string;
         newFileName: string;
     }> &
@@ -47,6 +47,7 @@ export type GitOpsCommands = {
         packageType: 'd' | 's' | 'o';
     }> &
         GitOpsCommands['Common'];
+    ScrapeRepository: GitOpsCommands['Common'];
 };
 
 const program = new Command();

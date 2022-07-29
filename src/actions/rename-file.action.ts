@@ -11,7 +11,7 @@ import {
 import { LogLevel } from '../utils/logger.util';
 import { GenericAction } from './generic.action';
 
-export type RenameFileActionOptions = GitOpsCommands['RenameFileAction'];
+export type RenameFileActionOptions = GitOpsCommands['RenameFile'];
 
 export type RenameFileActionResponse = void;
 

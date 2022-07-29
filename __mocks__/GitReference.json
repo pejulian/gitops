@@ -1,0 +1,10 @@
+{
+    "ref": "refs/heads/master",
+    "node_id": "MDM6UmVmMjg5MTpyZWZzL2hlYWRzL21hc3Rlcg==",
+    "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/refs/heads/master",
+    "object": {
+        "sha": "f312019e243adba83caca28e7002b2ac66f09056",
+        "type": "commit",
+        "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/commits/f312019e243adba83caca28e7002b2ac66f09056"
+    }
+}

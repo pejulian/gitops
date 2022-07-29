@@ -67,7 +67,7 @@ npx gitops rename-file
         .addOption(excludeRepositoriesOption)
         .addOption(targetFilePath)
         .addOption(newFileNameOption)
-        .action(async (options: GitOpsCommands['RenameFileAction']) => {
+        .action(async (options: GitOpsCommands['RenameFile']) => {
             const action = new RenameFileAction(options);
             await action.run();
         });

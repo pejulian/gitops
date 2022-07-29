@@ -43,6 +43,11 @@ export type GitCommit = components['schemas']['git-commit'];
 export type ShortBlob = components['schemas']['short-blob'];
 export type GitCreateCommitResponse = components['schemas']['git-commit'];
 
+export type GitTreeItemWithGitTree = [GitTreeItem, GitTreeHierachy];
+export type GitTreeHierachy = Omit<GitTree, 'tree'> & {
+    tree: Array<GitTreeItem | GitTreeItemWithGitTree>;
+};
+
 export type GithubUtilsOptions = Readonly<{
     githubToken?: string;
     tokenFilePath?: string;
@@ -178,7 +183,7 @@ export class GithubUtil {
 
     /**
      * Gets the root tree for the given repository
-     * @param repository The repository name
+     * @param repository The repository to use
      * @param ref The reference to search for. Must be formated as "heads/branch_name" for branches or "tags/tag_name" for tags
      * @param recursive Should all subtree's be returned as well
      */
@@ -217,7 +222,112 @@ export class GithubUtil {
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getRepositoryGitTree]`,
-                `Could not get repository tree with ref ${ref} for ${repository.name}\n`,
+                `Could not get repository root tree with ref ${ref} for ${repository.name}\n`,
+                e
+            );
+
+            throw e;
+        }
+    }
+
+    /**
+     * Gets the Git Tree for the Tree Item of type "tree".
+     * Will throw an error if the Git Item passed is not of type "tree".
+     *
+     * @param repository The repository to use
+     * @param item The Git Tree Item
+     */
+    public async getTreeForTreeItem(
+        repository: GitHubRepository,
+        item: GitTreeItem
+    ): Promise<GitTree> {
+        if (!item.sha) {
+            throw new Error('Tree item missing sha');
+        }
+
+        if (item.type !== 'tree') {
+            throw new Error('Tree item is not of type "tree"');
+        }
+
+        const tree = await this.getTree(repository, item.sha);
+
+        return tree;
+    }
+
+    /**
+     * Recursively fetches all sub trees from the given root tree
+     * @param repository The repository to which the tree belongs to
+     * @param rootTree The Git tree to start from
+     */
+    public async getTreesRecursively(
+        repository: GitHubRepository,
+        rootTree: GitTree
+    ): Promise<GitTreeHierachy> {
+        const recursivelyResolvedSubtrees = await Promise.all(
+            rootTree.tree.map(async (treeItem) => {
+                if (treeItem.type === 'tree') {
+                    const treeForTreeItem = await this.getTreeForTreeItem(
+                        repository,
+                        treeItem
+                    );
+
+                    return [
+                        treeItem,
+                        await this.getTreesRecursively(
+                            repository,
+                            treeForTreeItem
+                        )
+                    ] as GitTreeItemWithGitTree;
+                }
+
+                return treeItem as GitTreeItem;
+            })
+        );
+
+        return {
+            ...rootTree,
+            tree: recursivelyResolvedSubtrees
+        };
+    }
+
+    /**
+     * Get all trees of a repository on the given ref without the risk of getting a truncated tree as all child trees
+     * are fetched using individual requests.
+     * @param repository
+     * @param ref
+     * @returns
+     */
+    public async getRepositoryTrees(
+        repository: GitHubRepository,
+        ref = `heads/master`
+    ): Promise<GitTreeHierachy> {
+        try {
+            const reference = await this.getReference(repository, ref);
+
+            if (!reference) {
+                throw new Error(
+                    `No reference found in ${repository.name}: <${ref}>`
+                );
+            }
+
+            const commit = await this.getCommit(
+                repository,
+                reference.object.sha
+            );
+
+            if (!commit) {
+                throw new Error(
+                    `No commit found for reference object SHA ${reference.object.sha}`
+                );
+            }
+
+            const rootTree = await this.getTree(repository, commit.tree.sha);
+
+            return await this.getTreesRecursively(repository, rootTree);
+        } catch (e) {
+            this.logger.error(
+                `[${GithubUtil.CLASS_NAME}.getRepositoryGitTree]`,
+                `Could not get trees for ${repository.name} with ref ${ref}\n`,
                 e
             );
 
@@ -350,6 +460,13 @@ export class GithubUtil {
             if (result.status !== 200) {
                 throw new Error(
                     `Non successful status code while getting "${tree_sha}" - ${result.status}`
+                );
+            }
+
+            if (result.data.truncated) {
+                this.logger.warn(
+                    `[${GithubUtil.CLASS_NAME}.getTree]`,
+                    `The tree ${tree_sha} is truncated\n`
                 );
             }
 
@@ -1108,4 +1225,90 @@ export class GithubUtil {
             measure: sizes[i]
         };
     }
+
+    /**
+     * Determines if the given object is a GitTreeItem
+     * @param value The value to be tested to determine if it is a Git Tree Item
+     * @returns
+     */
+    public static isGitTreeItem(value: unknown): value is GitTreeItem {
+        if (!value) return false;
+        if (typeof value !== 'object') return false;
+        if (Array.isArray(value)) return false;
+        const { type, path } = value as GitTreeItem;
+        if (typeof type !== 'undefined' && typeof path !== 'undefined')
+            return true;
+        return false;
+    }
+
+    /**
+     * Determines if the given object is a GitTreeItemWithGitTree tuple
+     * @param value The value to be tested to determine if it is a GitTreeItem with a GitTree hierarchy tuple
+     * @returns
+     */
+    public static isGitTreeItemWithGitTree(
+        value: unknown
+    ): value is GitTreeItemWithGitTree {
+        if (!value) return false;
+        if (!Array.isArray(value)) return false;
+        if (value.length !== 2) return false;
+        const [item, tree] = value;
+        if (!GithubUtil.isGitTreeItem(item)) return false;
+        const { sha, tree: theTree } = tree as GitTreeHierachy;
+        if (typeof sha !== 'undefined' && typeof theTree !== 'undefined')
+            return true;
+        return false;
+    }
 }
+
+/**
+  node \
+  --no-warnings \
+  --experimental-specifier-resolution=node \
+  --experimental-modules \
+  --loader ts-node/esm src/utils/github.util.ts
+ */
+// (async () => {
+//     const { LoggerUtil, LogLevel } = await import('./logger.util');
+//     const { FilesystemUtil } = await import('./filesystem.util');
+//     const { writeFileSync } = await import('fs');
+
+//     const logger = new LoggerUtil(LogLevel.DEBUG, 'test');
+
+//     const gitUtil = new GithubUtil({
+//         logger,
+//         filesystemUtils: new FilesystemUtil({ logger })
+//     });
+
+//     const [repository] = await gitUtil.listRepositoriesForOrganization('c9', {
+//         onlyInclude: 'c9-stakeholder-service'
+//     });
+
+//     const ref = `heads/${repository.default_branch}`;
+
+//     writeFileSync(
+//         `__mocks__/GitRepository.json`,
+//         JSON.stringify(repository, undefined, 4)
+//     );
+
+//     const gitReference = await gitUtil.getReference(repository, ref);
+
+//     writeFileSync(
+//         `__mocks__/GitReference.json`,
+//         JSON.stringify(gitReference, undefined, 4)
+//     );
+
+//     const gitTree = await gitUtil.getTree(repository, ref);
+
+//     writeFileSync(
+//         `__mocks__/GitTree.json`,
+//         JSON.stringify(gitTree, undefined, 4)
+//     );
+
+//     const gitTreeHierachy = await gitUtil.getRepositoryTrees(repository, ref);
+
+//     writeFileSync(
+//         `__mocks__/GitTreeHierachy.json`,
+//         JSON.stringify(gitTreeHierachy, undefined, 4)
+//     );
+// })();

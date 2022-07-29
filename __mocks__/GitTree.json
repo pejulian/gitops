@@ -1,0 +1,150 @@
+{
+    "sha": "f312019e243adba83caca28e7002b2ac66f09056",
+    "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/trees/f312019e243adba83caca28e7002b2ac66f09056",
+    "tree": [
+        {
+            "path": ".gitignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2be28bf20207be983ba09c57290c77b919c974f2",
+            "size": 4986,
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/blobs/2be28bf20207be983ba09c57290c77b919c974f2"
+        },
+        {
+            "path": ".idea",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "74c6ba8d33e99bf4af270181f6b5cf89aa240824",
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/trees/74c6ba8d33e99bf4af270181f6b5cf89aa240824"
+        },
+        {
+            "path": ".prettierrc",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "feac1c7b72c7bda458a432eea93fedfe9e3d8dca",
+            "size": 97,
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/blobs/feac1c7b72c7bda458a432eea93fedfe9e3d8dca"
+        },
+        {
+            "path": ".vscode",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "dbe5ccae0b7f4d44321a8e067b899060da91e531",
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/trees/dbe5ccae0b7f4d44321a8e067b899060da91e531"
+        },
+        {
+            "path": "Jenkinsfile",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a1bf642e903157630d755cfcbd0a5a6ea034af14",
+            "size": 4947,
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/blobs/a1bf642e903157630d755cfcbd0a5a6ea034af14"
+        },
+        {
+            "path": "README.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "5ed38261d0ea260c8cd5f731f160c625ca3a2b7c",
+            "size": 1055,
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/blobs/5ed38261d0ea260c8cd5f731f160c625ca3a2b7c"
+        },
+        {
+            "path": "__data__",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "f818f85be4556ea52bdad9300603204918d18813",
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/trees/f818f85be4556ea52bdad9300603204918d18813"
+        },
+        {
+            "path": "__events__",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ca514d02e03fa93983159fc4e7d6b39a519ebc8b",
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/trees/ca514d02e03fa93983159fc4e7d6b39a519ebc8b"
+        },
+        {
+            "path": "__mocks__",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "d88dc5beb53036f070d40aa20daef88cb4fb581d",
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/trees/d88dc5beb53036f070d40aa20daef88cb4fb581d"
+        },
+        {
+            "path": "api",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "333c16cd39af764be8f31d5001bab509bc3ba0c1",
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/trees/333c16cd39af764be8f31d5001bab509bc3ba0c1"
+        },
+        {
+            "path": "documentation",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "12d8a62e41c8a8178bd86c5600db47d10bb28823",
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/trees/12d8a62e41c8a8178bd86c5600db47d10bb28823"
+        },
+        {
+            "path": "environment.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a973aaf52ed0ac06753dedcc15c4d412dff8ce4c",
+            "size": 12101,
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/blobs/a973aaf52ed0ac06753dedcc15c4d412dff8ce4c"
+        },
+        {
+            "path": "etc",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "417a40bab81de9b55eefb51bcc4072ab4b8ca8f3",
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/trees/417a40bab81de9b55eefb51bcc4072ab4b8ca8f3"
+        },
+        {
+            "path": "package-lock.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "328545f38f378b76d801ab0158b4a10026dc9fe3",
+            "size": 547303,
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/blobs/328545f38f378b76d801ab0158b4a10026dc9fe3"
+        },
+        {
+            "path": "package.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "5ea6c0085684607b2b982803739f9e1694472365",
+            "size": 2017,
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/blobs/5ea6c0085684607b2b982803739f9e1694472365"
+        },
+        {
+            "path": "sonar-project.properties",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6680516b646f459b451ef992a7e9d6d73aba408b",
+            "size": 343,
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/blobs/6680516b646f459b451ef992a7e9d6d73aba408b"
+        },
+        {
+            "path": "src",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "4db11c84d3d92f4352d79d4e47eb18a3210fe7ad",
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/trees/4db11c84d3d92f4352d79d4e47eb18a3210fe7ad"
+        },
+        {
+            "path": "wallaby.js",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "690280b06bc16b865474afccf5a758741eb3f28a",
+            "size": 590,
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/blobs/690280b06bc16b865474afccf5a758741eb3f28a"
+        },
+        {
+            "path": "webpack.config.js",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "330043ba58d6a17f2ada9a446cffa918929a7d87",
+            "size": 566,
+            "url": "https://github.devops.topdanmark.cloud/api/v3/repos/c9/c9-stakeholder-service/git/blobs/330043ba58d6a17f2ada9a446cffa918929a7d87"
+        }
+    ],
+    "truncated": false
+}
