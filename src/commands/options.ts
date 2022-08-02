@@ -47,7 +47,7 @@ export const excludeRepositoriesOption = new Option(
     'A list of repositories to be excluded when a command is run on an organization.'
 );
 
-export const targetFilePath = new Option(
+export const targetFilePathOption = new Option(
     '--target-file-path <value>',
     'The path to the filename that should be renamed'
 ).makeOptionMandatory(true);
@@ -93,3 +93,23 @@ export const mandatoryFilesOption = new Option(
     `--mandatory-files [value...]`,
     `A list of files that must be present in the repository for it to be deemed as deployable`
 ).default([]);
+
+export const searchForOption = new Option(
+    `--search-for <value>`,
+    `A regex string containing the match to search for in files. Use a site like https://regex101.com/ to construct and test expressions that will accomplish the find and replace criteria you have against given content. Only specify the body of the regexp here. To specify flags for the regexp, use the --search-for-flags option.`
+);
+
+export const searchForFlagsOption = new Option(
+    `--search-for-flags <value>`,
+    `Regex flags to apply to the supplied regex string via --search-for. Use a site like https://regex101.com/ to construct and test expressions that will accomplish the find and replace criteria you have against given content`
+).default('g');
+
+export const replaceWithOption = new Option(
+    `--replace-with <value>`,
+    `A string containing a value to replace a matched search string.`
+);
+
+export const filesToMatchOption = new Option(
+    `--files-to-match [value...]`,
+    `An array of regexes that will be used to match files in the repository`
+);

@@ -8,7 +8,7 @@ import {
     GitTreeWithFileDescriptor,
     GitHubRepository
 } from '../utils/github.util';
-import { LogLevel } from '../utils/logger.util';
+import { LoggerUtil, LogLevel } from '../utils/logger.util';
 import { GenericAction } from './generic.action';
 
 export type RenameFileActionOptions = GitOpsCommands['RenameFile'];
@@ -36,37 +36,55 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
 
         this.targetFilePath = options.targetFilePath;
         this.newFileName = options.newFileName;
-        this.excludeRepositories = options.excludeRepositories;
-        this.gitRef = options.ref;
     }
 
     public async run(): Promise<RenameFileActionResponse> {
-        this.logger.info(
-            `[${RenameFileAction.CLASS_NAME}.run]`,
-            `Renaming ${this.targetFilePath} to ${this.newFileName} in ${this.organizations.length} organization(s)`
-        );
+        this.actionReporter.startReport(this.organizations, [
+            `Renaming ${this.targetFilePath} to ${this.newFileName}`
+        ]);
 
-        this.logger.debug(
-            `[${RenameFileAction.CLASS_NAME}.run]`,
-            `Git organizations to work on are:\n${this.organizations
-                .map((organization, index) => {
-                    return `[${index + 1}] ${organization}\n`;
-                })
-                .join('')}`
-        );
+        for await (const [
+            index,
+            organization
+        ] of this.organizations.entries()) {
+            this.actionReporter.addSubHeader([
+                `[${index + 1}] Running for the organization ${organization}`
+            ]);
 
-        for await (const organization of this.organizations) {
-            const repositories =
-                await this.listApplicableRepositoriesForOperation(organization);
+            let repositories: Array<GitHubRepository>;
 
-            for await (const repository of repositories) {
-                // When every loop starts, ensure that all previous terms are cleared
-                this.logger.clearTermsFromLogPrefix();
+            try {
+                repositories =
+                    await this.listApplicableRepositoriesForOperation(
+                        organization
+                    );
+            } catch (e) {
+                this.logger.error(
+                    `[${RenameFileAction.CLASS_NAME}.run]`,
+                    `Failed to list repositories for the ${organization} organization\n`,
+                    e
+                );
 
-                // Append the organization and repo name
-                this.logger.appendTermToLogPrefix(repository.full_name);
+                this.actionReporter.addGeneralError({
+                    message: `${LoggerUtil.getErrorMessage(e)}`
+                });
 
-                const descriptorWithTree =
+                continue;
+            }
+
+            let descriptorWithTree: GitTreeWithFileDescriptor;
+
+            for await (const [
+                innerIndex,
+                repository
+            ] of repositories.entries()) {
+                this.actionReporter.addSubHeader([
+                    `[${innerIndex + 1}] ${repository.full_name} <${
+                        this.gitRef ?? `heads/${repository.default_branch}`
+                    }>`
+                ]);
+
+                const findResults =
                     await this.githubUtil.findTreeAndDescriptorForFilePath(
                         repository,
                         [this.targetFilePath],
@@ -74,18 +92,22 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                         true
                     );
 
-                if (!descriptorWithTree?.descriptors?.[0]) {
+                if (!findResults?.descriptors?.[0]) {
                     this.logger.warn(
                         `[${RenameFileAction.CLASS_NAME}.run]`,
-                        `The target file path ${
-                            this.targetFilePath
-                        } was not found in ${repository.name} <${
-                            this.gitRef ?? `heads/${repository.default_branch}`
-                        }>`
+                        `The target file path ${this.targetFilePath} was not found`
                     );
+
+                    this.actionReporter.addSkipped({
+                        name: repository.full_name,
+                        reason: `The target file path ${this.targetFilePath} was not found`,
+                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    });
 
                     continue;
                 }
+
+                descriptorWithTree = findResults;
 
                 try {
                     await this.writeFileWithNewName(
@@ -95,23 +117,22 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                 } catch (e) {
                     this.logger.error(
                         `[${RenameFileAction.CLASS_NAME}.run]`,
-                        `Internal error while running rename for the file ${this.targetFilePath} in ${repository.name}.\n`,
+                        `Error renaming the file ${this.targetFilePath} in ${repository.name}.\n`,
                         e
                     );
+
+                    this.actionReporter.addFailed({
+                        name: repository.full_name,
+                        reason: `${LoggerUtil.getErrorMessage(e)}`,
+                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    });
 
                     continue;
                 }
             }
         }
 
-        this.logger.info(
-            `[${RenameFileAction.CLASS_NAME}.run]`,
-            `Operation completed.\n`,
-            `View full output log at ${
-                this.logger.getLogFilePaths().outputLog
-            }\n`,
-            `View full error log at ${this.logger.getLogFilePaths().errorLog}`
-        );
+        this.actionReporter.completeReport();
     }
 
     public async writeFileWithNewName(

@@ -62,6 +62,10 @@ export class LoggerUtil {
         };
     }
 
+    public get command(): string {
+        return this._command;
+    }
+
     public get logLevel(): LogLevel {
         return this._logLevel;
     }
@@ -182,6 +186,12 @@ export class LoggerUtil {
             );
         } else {
             console.debug(chalk.cyanBright(messageWithTerms));
+        }
+    }
+
+    public static getErrorMessage(e: unknown) {
+        if (e instanceof Error) {
+            return e.message;
         }
     }
 

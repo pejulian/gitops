@@ -48,6 +48,18 @@ export type GitTreeHierachy = Omit<GitTree, 'tree'> & {
     tree: Array<GitTreeItem | GitTreeItemWithGitTree>;
 };
 
+export type CommitResponse =
+    RestEndpointMethodTypes['git']['updateRef']['response'];
+
+export type EnrichedGitTreeItem = GitTreeItem &
+    Readonly<{
+        treeSha?: string;
+    }>;
+
+export type FlattenedGitTree = Omit<GitTree, 'tree'> & {
+    tree: Array<EnrichedGitTreeItem>;
+};
+
 export type GithubUtilsOptions = Readonly<{
     githubToken?: string;
     tokenFilePath?: string;
@@ -291,16 +303,30 @@ export class GithubUtil {
     }
 
     /**
-     * Get all trees of a repository on the given ref without the risk of getting a truncated tree as all child trees
-     * are fetched using individual requests.
-     * @param repository
-     * @param ref
+     * Get all trees of a repository on the given ref without the risk of getting a truncated tree as all child trees are fetched using individual requests.
+     *
+     * To get a response that is similar to {@linkcode getRepositoryGitTree}, pass true as the 3rd argument of this function. The response will now include all blob paths in the root array with an added property of which tree it belongs to.
+     *
+     * @param repository The repository object
+     * @param ref The git reference to operate on
+     * @param flatten Flatten the hierarchy so that all blobs are returned in the root array
      * @returns
      */
-    public async getRepositoryTrees(
+    public async getRepositoryFullGitTree(
         repository: GitHubRepository,
-        ref = `heads/master`
-    ): Promise<GitTreeHierachy> {
+        ref?: string,
+        flatten?: false
+    ): Promise<GitTreeHierachy>;
+    public async getRepositoryFullGitTree(
+        repository: GitHubRepository,
+        ref?: string,
+        flatten?: true
+    ): Promise<FlattenedGitTree>;
+    public async getRepositoryFullGitTree(
+        repository: GitHubRepository,
+        ref = `heads/master`,
+        flatten?: boolean
+    ): Promise<GitTreeHierachy | FlattenedGitTree> {
         try {
             const reference = await this.getReference(repository, ref);
 
@@ -323,7 +349,16 @@ export class GithubUtil {
 
             const rootTree = await this.getTree(repository, commit.tree.sha);
 
-            return await this.getTreesRecursively(repository, rootTree);
+            const hierarchy = await this.getTreesRecursively(
+                repository,
+                rootTree
+            );
+
+            if (flatten) {
+                return GithubUtil.flattenGitTreeHierarchy(hierarchy);
+            } else {
+                return hierarchy;
+            }
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.getRepositoryGitTree]`,
@@ -679,15 +714,15 @@ export class GithubUtil {
         ref = `heads/master`,
         fileDescriptorWithTree?: GitTreeWithFileDescriptor,
         options: Readonly<{
-            removeSubtrees: boolean;
-            globOptions?: GlobOptions;
-        }> = {
             /**
              * Should be set to false if the fileDescriptorWithTree contains a tree that was NOT fetched recursively
              */
+            removeSubtrees: boolean;
+            globOptions?: GlobOptions;
+        }> = {
             removeSubtrees: true
         }
-    ) {
+    ): Promise<GitReference> {
         this.logger.debug(
             `[${GithubUtil.CLASS_NAME}.uploadToRepository]`,
             `Uploading to ${repository.name} <${ref}> from ${uploadDirPath}`
@@ -784,6 +819,8 @@ export class GithubUtil {
             `New commit pushed to ${ref} by ${newCommit.author.name} <${newCommit.author.email}>\n`,
             JSON.stringify(commitBranchResponse, undefined, 4)
         );
+
+        return commitBranchResponse;
     }
 
     /**
@@ -1160,8 +1197,18 @@ export class GithubUtil {
         }
     }
 
+    /**
+     * Shallow level searching of a Git Tree.
+     * This will only search the given Git Tree object. If the tree is truncated, the search may yield a false negative.
+     * Use the GitTreeHierarchy search for a comprehensive and exhaustive search.
+     *
+     * @param treeToSearch The tree to search through
+     * @param typeToSearchFor Search for blobs or trees
+     * @param descriptorToMatch The descriptor to match (the file path)
+     * @returns
+     */
     public findMatchingDescriptor(
-        treeToSearch: GitTree['tree'],
+        treeToSearch: GitTree['tree'] | FlattenedGitTree['tree'],
         typeToSearchFor: 'blob' | 'tree',
         descriptorToMatch: string
     ): GitTreeItem | undefined {
@@ -1259,6 +1306,147 @@ export class GithubUtil {
             return true;
         return false;
     }
+
+    /**
+     * Recursively search through a Git Tree Hierarchy to find the specified file path.
+     *
+     * The return response will contain the descriptor, which is an object containing metadata about the file that was found, the tree object containing the file, if it was found, and an array of all Git Tree SHAs traversed to reach the file. The immediate parent folder of the file can be found the last SHA in the array.
+     *
+     * @param path An array representing the path to search for
+     * @param hierarchy The git tree hierarchy to search through
+     * @returns
+     */
+    public static findInGitTreeHierarchy(
+        path: Array<string>,
+        hierarchy: GitTreeHierachy,
+        treePathSha: Array<string> = []
+    ): Readonly<{
+        treePathSha: Array<string>;
+        tree: GitTreeHierachy;
+        descriptor?: GitTreeItem;
+    }> {
+        const { tree } = hierarchy;
+
+        const pathElement = path.shift();
+
+        if (!pathElement)
+            throw new Error(`The path ${path} was not found in tree`);
+
+        if (path.length === 0) {
+            const candidates = _.filter(tree, GithubUtil.isGitTreeItem);
+
+            if (!candidates) {
+                throw new Error(
+                    `The file ${pathElement} was not found in tree`
+                );
+            }
+
+            const match = candidates.find(
+                (treeItem) => treeItem.path === pathElement
+            );
+
+            if (!match) {
+                throw new Error(
+                    `The file ${pathElement} was not found in tree`
+                );
+            }
+
+            treePathSha.pop();
+
+            return {
+                treePathSha,
+                tree: hierarchy,
+                descriptor: match
+            };
+        } else {
+            const candidates = _.filter(
+                tree,
+                GithubUtil.isGitTreeItemWithGitTree
+            );
+
+            if (!candidates) {
+                throw new Error(
+                    `The path ${pathElement}/${path.join(
+                        '/'
+                    )} was not found in tree`
+                );
+            }
+
+            const match = candidates.find(
+                ([childTreeItemDescriptor]) =>
+                    childTreeItemDescriptor.path === pathElement
+            );
+
+            if (!match) {
+                throw new Error(
+                    `No match found for ${pathElement}/${path.join(
+                        '/'
+                    )} in tree`
+                );
+            }
+
+            treePathSha.push(match[1].sha);
+
+            return GithubUtil.findInGitTreeHierarchy(
+                path,
+                match[1],
+                treePathSha
+            );
+        }
+    }
+
+    public static flattenGitTreeHierarchy(
+        hierarchy: GitTreeHierachy,
+        allItems: Array<EnrichedGitTreeItem> = [],
+        paths: Array<string> = []
+    ): FlattenedGitTree {
+        const { tree, ...attrs } = hierarchy;
+
+        for (const item of tree) {
+            if (GithubUtil.isGitTreeItem(item)) {
+                allItems.push({
+                    ...item,
+                    path: `${paths.length ? `${paths.join('/')}/` : ''}${
+                        item.path
+                    }`,
+                    treeSha: attrs.sha
+                });
+            } else {
+                const [nestedTreeDescriptor, nestedTree] = item;
+
+                nestedTreeDescriptor.path &&
+                    paths.push(nestedTreeDescriptor.path);
+
+                for (const nestedItem of nestedTree.tree) {
+                    if (GithubUtil.isGitTreeItem(nestedItem)) {
+                        allItems.push({
+                            ...nestedItem,
+                            path: `${
+                                paths.length ? `${paths.join('/')}/` : ''
+                            }${nestedItem.path}`,
+                            treeSha: nestedTreeDescriptor.sha
+                        });
+                    } else {
+                        const [deepTreeDescriptor, deepTree] = nestedItem;
+
+                        deepTreeDescriptor.path &&
+                            paths.push(deepTreeDescriptor.path);
+
+                        this.flattenGitTreeHierarchy(deepTree, allItems, paths);
+
+                        paths.pop();
+                    }
+                }
+
+                nestedTreeDescriptor.path && paths.pop();
+            }
+        }
+
+        return {
+            ...attrs,
+            tree: allItems
+        };
+    }
 }
 
 /**
@@ -1268,6 +1456,7 @@ export class GithubUtil {
   --experimental-modules \
   --loader ts-node/esm src/utils/github.util.ts
  */
+
 // (async () => {
 //     const { LoggerUtil, LogLevel } = await import('./logger.util');
 //     const { FilesystemUtil } = await import('./filesystem.util');
@@ -1305,10 +1494,35 @@ export class GithubUtil {
 //         JSON.stringify(gitTree, undefined, 4)
 //     );
 
-//     const gitTreeHierachy = await gitUtil.getRepositoryTrees(repository, ref);
+//     const gitTreeHierachy = await gitUtil.getRepositoryFullGitTree(
+//         repository,
+//         ref
+//     );
 
 //     writeFileSync(
 //         `__mocks__/GitTreeHierachy.json`,
 //         JSON.stringify(gitTreeHierachy, undefined, 4)
+//     );
+
+//     const pathParts = FilesystemUtil.getPathParts(
+//         'src\\v1\\DOCUMENTATION_V1.md'
+//     );
+
+//     const match = GithubUtil.findInGitTreeHierarchy(pathParts, gitTreeHierachy);
+
+//     writeFileSync(
+//         `__mocks__/FindInGitTreeHierarchy.json`,
+//         JSON.stringify(match, undefined, 4)
+//     );
+
+//     const flattenedGitTreeHierachy = await gitUtil.getRepositoryFullGitTree(
+//         repository,
+//         ref,
+//         true
+//     );
+
+//     writeFileSync(
+//         `__mocks__/FlattenedGitTreeHierachy.json`,
+//         JSON.stringify(flattenedGitTreeHierachy, undefined, 4)
 //     );
 // })();

@@ -4,7 +4,7 @@ import {
     GitTreeItem,
     GitTreeWithFileDescriptor
 } from '../utils/github.util';
-import { LogLevel } from '../utils/logger.util';
+import { LoggerUtil, LogLevel } from '../utils/logger.util';
 import { InstallModes, NpmUtil, PackageTypes } from '../utils/npm.util';
 import { GenericAction } from './generic.action';
 import _ from 'lodash';
@@ -41,40 +41,73 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
     }
 
     public async run(): Promise<UninstallPackageActionResponse> {
-        this.logger.info(
-            `[${UninstallPackageAction.CLASS_NAME}.run]`,
+        this.actionReporter.startReport(this.organizations, [
             `Uninstalling ${this.packageName}`
-        );
+        ]);
 
-        this.logger.debug(
-            `[${UninstallPackageAction.CLASS_NAME}.run]`,
-            `Git organizations to work on are:\n${this.organizations
-                .map((organization, index) => {
-                    return `[${index + 1}] ${organization}\n`;
-                })
-                .join('')}`
-        );
+        // Run for every given organization
+        for await (const [
+            index,
+            organization
+        ] of this.organizations.entries()) {
+            this.actionReporter.addSubHeader([
+                `[${index + 1}] Running for the organization ${organization}`
+            ]);
 
-        try {
-            // Run for every given organization
-            for await (const organization of this.organizations) {
-                const tmpDir =
-                    this.filesystemUtil.createSubdirectoryAtProjectRoot();
+            let repositories: Array<GitHubRepository>;
 
-                const repositories =
+            try {
+                repositories =
                     await this.listApplicableRepositoriesForOperation(
                         organization
                     );
+            } catch (e) {
+                this.logger.error(
+                    `[${UninstallPackageAction.CLASS_NAME}.run]`,
+                    `Failed to list repositories for the ${organization} organization\n`,
+                    e
+                );
 
-                // Run for every fetched repository in the organization
-                for await (const repository of repositories) {
-                    // When every loop starts, ensure that all previous terms are cleared
-                    this.logger.clearTermsFromLogPrefix();
+                this.actionReporter.addGeneralError({
+                    message: `${LoggerUtil.getErrorMessage(e)}`
+                });
 
-                    // Append the organization and repo name
-                    this.logger.appendTermToLogPrefix(repository.full_name);
+                continue;
+            }
 
-                    const descriptorWithTree =
+            let tmpDir: string;
+            try {
+                tmpDir = this.filesystemUtil.createSubdirectoryAtProjectRoot();
+            } catch (e) {
+                this.logger.error(
+                    `[${UninstallPackageAction.CLASS_NAME}.run]`,
+                    `Failed to create temporary directory for operation\n`,
+                    e
+                );
+
+                this.actionReporter.addGeneralError({
+                    message: `${LoggerUtil.getErrorMessage(e)}`
+                });
+
+                continue;
+            }
+
+            let repoPath: string;
+            let descriptorWithTree: GitTreeWithFileDescriptor;
+
+            // Run for every fetched repository in the organization
+            for await (const [
+                innerIndex,
+                repository
+            ] of repositories.entries()) {
+                this.actionReporter.addSubHeader([
+                    `[${innerIndex + 1}] ${repository.full_name} <${
+                        this.gitRef ?? `heads/${repository.default_branch}`
+                    }>`
+                ]);
+
+                try {
+                    const findResults =
                         await this.githubUtil.findTreeAndDescriptorForFilePath(
                             repository,
                             [
@@ -84,87 +117,119 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                             this.gitRef ?? `heads/${repository.default_branch}`
                         );
 
-                    if (descriptorWithTree?.descriptors.length !== 2) {
+                    if (findResults?.descriptors.length !== 2) {
                         this.logger.warn(
                             `[${UninstallPackageAction.CLASS_NAME}.run]`,
-                            `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${
-                                NpmUtil.LOCKFILE_FILE_NAME
-                            } was not found in ${repository.name} <${
+                            `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME} was not found`
+                        );
+
+                        this.actionReporter.addSkipped({
+                            name: repository.full_name,
+                            reason: `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME} was not found`,
+                            ref:
                                 this.gitRef ??
                                 `heads/${repository.default_branch}`
-                            }>`
-                        );
+                        });
 
                         continue;
                     }
 
-                    const repoPath = await this.uninstallPackageForProject(
+                    descriptorWithTree = findResults;
+                } catch (e) {
+                    this.actionReporter.addFailed({
+                        name: repository.full_name,
+                        reason: `${LoggerUtil.getErrorMessage(e)}`,
+                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    });
+
+                    continue;
+                }
+
+                try {
+                    const theRepoPath = await this.uninstallPackageForProject(
                         repository,
                         descriptorWithTree.descriptors,
                         tmpDir
                     );
 
                     // If no repo path is returned, something wrong happened and we should skip...
-                    if (!repoPath) {
+                    if (!theRepoPath) {
+                        this.actionReporter.addSkipped({
+                            name: repository.full_name,
+                            reason: `Package uninstallation was not done`,
+                            ref:
+                                this.gitRef ??
+                                `heads/${repository.default_branch}`
+                        });
+
                         continue;
                     }
 
-                    // Remove any file descriptors that match
-                    _.remove(descriptorWithTree.tree.tree, (treeItem) => {
-                        const shaMatch = _.find(
-                            descriptorWithTree.descriptors,
-                            (item) => item.sha === treeItem.sha
-                        );
-
-                        return shaMatch ? true : false;
+                    repoPath = theRepoPath;
+                } catch (e) {
+                    this.actionReporter.addFailed({
+                        name: repository.full_name,
+                        reason: `${LoggerUtil.getErrorMessage(e)}`,
+                        ref: this.gitRef ?? `heads/${repository.default_branch}`
                     });
 
-                    try {
-                        await this.githubUtil.uploadToRepository(
-                            repoPath,
-                            repository,
-                            `Uninstall ${this.packageName} from ${
-                                PackageTypes[this.packageType]
-                            }`,
-                            this.gitRef ?? `heads/${repository.default_branch}`,
-                            descriptorWithTree,
-                            {
-                                removeSubtrees: false, // set to false because we didnt obtain the tree recursively
-                                globOptions: {
-                                    deep: 1,
-                                    onlyFiles: true
-                                }
-                            }
-                        );
-                    } catch (e) {
-                        this.logger.warn(
-                            `[${UninstallPackageAction.CLASS_NAME}.run]`,
-                            `Failed to upload changes\n`,
-                            e
-                        );
-
-                        continue;
-                    }
+                    continue;
                 }
 
-                this.filesystemUtil.removeDirectory(tmpDir);
+                // Remove any file descriptors that match
+                _.remove(descriptorWithTree.tree.tree, (treeItem) => {
+                    const shaMatch = _.find(
+                        descriptorWithTree.descriptors,
+                        (item) => item.sha === treeItem.sha
+                    );
+
+                    return shaMatch ? true : false;
+                });
+
+                try {
+                    await this.githubUtil.uploadToRepository(
+                        repoPath,
+                        repository,
+                        `Uninstall ${this.packageName} from ${
+                            PackageTypes[this.packageType]
+                        }`,
+                        this.gitRef ?? `heads/${repository.default_branch}`,
+                        descriptorWithTree,
+                        {
+                            removeSubtrees: false, // set to false because we didnt obtain the tree recursively
+                            globOptions: {
+                                deep: 1,
+                                onlyFiles: true
+                            }
+                        }
+                    );
+                } catch (e) {
+                    this.logger.warn(
+                        `[${UninstallPackageAction.CLASS_NAME}.run]`,
+                        `Failed to commit changes\n`,
+                        e
+                    );
+
+                    this.actionReporter.addFailed({
+                        name: repository.full_name,
+                        reason: `${LoggerUtil.getErrorMessage(e)}`,
+                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    });
+
+                    continue;
+                }
+
+                this.actionReporter.addSuccessful({
+                    name: repository.full_name,
+                    reason: `Uninstalled ${this.packageName} successfully`,
+                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                });
             }
-        } catch (e) {
-            this.logger.error(
-                `[${UninstallPackageAction.CLASS_NAME}.run]`,
-                `Internal error while running the operation.\n`,
-                e
-            );
+
+            this.filesystemUtil.removeDirectory(tmpDir);
         }
 
-        this.logger.info(
-            `[${UninstallPackageAction.CLASS_NAME}.run]`,
-            `Operation completed.\n`,
-            `View full output log at ${
-                this.logger.getLogFilePaths().outputLog
-            }\n`,
-            `View full error log at ${this.logger.getLogFilePaths().errorLog}`
-        );
+        this.actionReporter.completeReport();
     }
 
     public async uninstallPackageForProject(
@@ -186,6 +251,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
         };
 
         const descriptorWithContents: Array<DescriptorWithContents> = [];
+
         try {
             for await (const descriptor of descriptors) {
                 const content = await this.githubUtil.getFileDescriptorContent(
@@ -207,6 +273,9 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                 e
             );
 
+            // Don't throw an error because this is not an error in the execution itself
+            // but rather the nature of the repository which did not meet the criteria
+            // for this operation.
             return undefined;
         }
 
@@ -226,7 +295,9 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                 `Failed to read ${NpmUtil.LOCKFILE_FILE_NAME} descriptor\n`,
                 e
             );
-            throw e;
+
+            // Its possible that a repo doesn't have a package-lock.json
+            return undefined;
         }
 
         let packageJsonDescriptorAndContent: DescriptorWithContents | undefined;
@@ -244,7 +315,9 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                 `[${UninstallPackageAction.CLASS_NAME}.uninstallPackageForProject]`,
                 `Failed to read ${NpmUtil.PACKAGE_JSON_FILE_NAME} descriptor`
             );
-            throw e;
+
+            // Its possible that a repo doesn't have a package.json
+            return undefined;
         }
 
         if (!lockfileDescriptorAndContent || !packageJsonDescriptorAndContent) {
@@ -253,6 +326,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                 `Failed to resolve content for ${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME}`
             );
 
+            // It's possible that a repo doesn't have a package-lock.json or package.json file
             return undefined;
         }
 
@@ -348,7 +422,9 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                     uninstallExistingPackageResponse.response
                 );
 
-                return undefined;
+                throw new Error(
+                    `The command ${uninstallExistingPackageResponse.command} failed to execute`
+                );
             }
 
             // If a prepare script was removed in the above operation, add it back...
@@ -382,7 +458,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                 e
             );
 
-            return undefined;
+            throw e;
         }
     }
 }

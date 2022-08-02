@@ -34,6 +34,7 @@ Install a new package in the effected repositories for the given organizations.
     -f GIT_REF 
     -r RegExp 
     -i RepositoryName, ..., n
+    -e RepositoryName, ..., n
 ]
 
 Examples:

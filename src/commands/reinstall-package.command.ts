@@ -36,6 +36,7 @@ Reinstall an existing package in the effected repositories for the given organiz
     -f GIT_REF 
     -r RegExp 
     -i RepositoryName, ..., n
+    -e RepositoryName, ..., n
     --package-update-constraint SEMVER 
     --package-update-condition lte|lt|gte|gt|eq 
 ]

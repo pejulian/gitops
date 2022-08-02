@@ -4,6 +4,7 @@ import { LoggerUtil, LogLevel } from '../utils/logger.util';
 import { NpmUtil } from '../utils/npm.util';
 import { ProcessorUtil } from '../utils/processsor.util';
 import { SemverUtil } from '../utils/semver.util';
+import { ActionReporter } from '../reporters/action.reporter';
 
 export interface IGenericAction<T> {
     run(): Promise<T>;
@@ -62,6 +63,8 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
     protected readonly semverUtil: SemverUtil;
     protected readonly npmUtil: NpmUtil;
 
+    protected readonly actionReporter: ActionReporter;
+
     protected organizations: Array<string>;
     protected repositories: string | undefined;
     protected excludeRepositories: Array<string> | undefined;
@@ -74,6 +77,11 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
         const logLevel = options.logLevel ?? LogLevel.ERROR;
 
         this.logger = new LoggerUtil(logLevel, options.command);
+
+        this.actionReporter = new ActionReporter({
+            logger: this.logger,
+            command: options.command
+        });
 
         this.processorUtil = new ProcessorUtil({
             logger: this.logger
@@ -139,9 +147,9 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
                     .map((repository, index) => {
                         return `[${index + 1}] ${repository.name} [${
                             this.gitRef ?? `heads/${repository.default_branch}`
-                        }]\n`;
+                        }]`;
                     })
-                    .join('')}`
+                    .join('\n')}`
             );
         } catch (e) {
             this.logger.warn(

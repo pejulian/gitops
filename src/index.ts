@@ -48,6 +48,13 @@ export type GitOpsCommands = {
     }> &
         GitOpsCommands['Common'];
     ScrapeRepository: GitOpsCommands['Common'];
+    FindAndReplace: Readonly<{
+        searchFor: string;
+        searchForFlags: string;
+        replaceWith: string;
+        filesToMatch: Array<string>;
+    }> &
+        GitOpsCommands['Common'];
 };
 
 const program = new Command();

@@ -34,6 +34,7 @@ Uninstalls an existing package from repositories in the given Git organizations.
     -f GIT_REF 
     -r RegExp 
     -i RepositoryName, ..., n
+    -e RepositoryName, ..., n
     --package-update-constraint SEMVER 
     --package-update-condition lte|lt|gte|gt|eq 
 ]

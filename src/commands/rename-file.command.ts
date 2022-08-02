@@ -10,7 +10,7 @@ import {
     repositoriesOption,
     repositoryListOption,
     excludeRepositoriesOption,
-    targetFilePath,
+    targetFilePathOption,
     newFileNameOption
 } from './options';
 
@@ -34,6 +34,7 @@ Rename a file identified by its file path in one, many or all repositories for a
     -f GIT_REF 
     -r RegExp 
     -i RepositoryName, ..., n
+    -e RepositoryName, ..., n
 ]
 
 Examples:
@@ -65,7 +66,7 @@ npx gitops rename-file
         .addOption(repositoriesOption)
         .addOption(repositoryListOption)
         .addOption(excludeRepositoriesOption)
-        .addOption(targetFilePath)
+        .addOption(targetFilePathOption)
         .addOption(newFileNameOption)
         .action(async (options: GitOpsCommands['RenameFile']) => {
             const action = new RenameFileAction(options);

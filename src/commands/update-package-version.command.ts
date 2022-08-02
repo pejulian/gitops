@@ -36,6 +36,7 @@ Updates the version of an existing npm package in package.json for all affected 
     -f GIT_REF 
     -r RegExp 
     -i RepositoryName, ..., n
+    -e RepositoryName, ..., n
     --package-update-constraint SEMVER 
     --package-update-condition lte|lt|gte|gt|eq 
 ]

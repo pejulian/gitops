@@ -44,19 +44,9 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
     }
 
     public async run(): Promise<UpdatePackageVersionActionResponse> {
-        this.logger.info(
-            `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+        this.actionReporter.startReport(this.organizations, [
             `Updating ${this.packageName} to version ${this.packageVersion}`
-        );
-
-        this.logger.debug(
-            `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-            `Git organizations to work on are:\n${this.organizations
-                .map((organization, index) => {
-                    return `[${index + 1}] ${organization}\n`;
-                })
-                .join('')}`
-        );
+        ]);
 
         try {
             // Determine if the package version that we are trying to update to exists
@@ -84,11 +74,10 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     );
 
                 for await (const repository of repositories) {
-                    // When every loop starts, ensure that all previous terms are cleared
-                    this.logger.clearTermsFromLogPrefix();
-
-                    // Append the organization and repo name
-                    this.logger.appendTermToLogPrefix(repository.full_name);
+                    this.actionReporter.addSubHeader([
+                        repository.full_name,
+                        this.gitRef ?? `heads/${repository.default_branch}`
+                    ]);
 
                     const descriptorWithTree =
                         await this.githubUtil.findTreeAndDescriptorForFilePath(
@@ -172,14 +161,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             );
         }
 
-        this.logger.info(
-            `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-            `Operation completed.\n`,
-            `View full output log at ${
-                this.logger.getLogFilePaths().outputLog
-            }\n`,
-            `View full error log at ${this.logger.getLogFilePaths().errorLog}`
-        );
+        this.actionReporter.completeReport();
     }
 
     public async updatePackageVersionForProject(

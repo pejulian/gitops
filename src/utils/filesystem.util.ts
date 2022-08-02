@@ -229,18 +229,68 @@ export class FilesystemUtil {
         return relative(rootPath, filePath);
     }
 
+    /**
+     * Clean the file path so that it is ready for subsequent processing.
+     *
+     * @param filePath The file path to process
+     * @returns
+     */
+    public static cleanFilePath(filePath: string) {
+        const sanitizedPath = filePath.replace(/\\/g, '/');
+
+        return sanitizedPath;
+    }
+
+    /**
+     * Get the file name from a file path string without the directory path.
+     *
+     * @param filePath The path to process
+     * @returns
+     */
     public static getFileNameFromPath(filePath: string): string {
-        const pathParts = filePath.split('/');
+        const sanitizedPath = FilesystemUtil.cleanFilePath(filePath);
+
+        const pathParts = sanitizedPath.split('/');
+
         const [fileName] = pathParts.reverse();
+
         return fileName;
     }
 
+    /**
+     * Get only the directory portion of the file path as an array, excluding the file name
+     * @param filePath The path to process
+     * @returns
+     */
     public static getDirectoryPartsFromPath(filePath: string): Array<string> {
-        const pathParts = filePath.split('/');
+        const sanitizedPath = FilesystemUtil.cleanFilePath(filePath);
+
+        const pathParts = sanitizedPath.split('/');
+
         const [, ...directoryPaths] = pathParts.reverse();
+
         if (directoryPaths[directoryPaths.length - 1] === '.') {
             directoryPaths.pop();
         }
+
         return directoryPaths;
+    }
+
+    /**
+     * Get all path parts for the given path string as an array, including the file name.
+     *
+     * @param filePath The path to process
+     * @returns
+     */
+    public static getPathParts(filePath: string): Array<string> {
+        let sanitizedPath = FilesystemUtil.cleanFilePath(filePath);
+
+        sanitizedPath = sanitizedPath.startsWith('/')
+            ? sanitizedPath.substring(1)
+            : sanitizedPath;
+
+        const pathElements = sanitizedPath.split('/');
+
+        return pathElements;
     }
 }

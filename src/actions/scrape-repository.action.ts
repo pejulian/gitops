@@ -30,9 +30,6 @@ export class ScrapeRepositoryAction extends GenericAction<ScrapeRepositoryAction
             gitRef: options.ref,
             command: ScrapeRepositoryAction.CLASS_NAME
         });
-
-        this.excludeRepositories = options.excludeRepositories;
-        this.gitRef = options.ref;
     }
 
     public async run(): Promise<ScrapeRepositoryActionResponse> {
@@ -60,6 +57,15 @@ export class ScrapeRepositoryAction extends GenericAction<ScrapeRepositoryAction
 
                 // Append the organization and repo name
                 this.logger.appendTermToLogPrefix(repository.full_name);
+
+                try {
+                    await this.scrapeRepository(repository);
+                } catch (e) {
+                    this.logger.error(
+                        `[${ScrapeRepositoryAction.CLASS_NAME}.run]`,
+                        `An error occured while scraping ${repository.full_name}`
+                    );
+                }
             }
         }
 
@@ -71,5 +77,11 @@ export class ScrapeRepositoryAction extends GenericAction<ScrapeRepositoryAction
             }\n`,
             `View full error log at ${this.logger.getLogFilePaths().errorLog}`
         );
+    }
+
+    private async scrapeRepository(
+        repository: GitHubRepository
+    ): Promise<void> {
+        console.log('TODO', repository);
     }
 }
