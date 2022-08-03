@@ -62,7 +62,10 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                     `[${ReinstallPackageAction.CLASS_NAME}.run]`,
                     `The specified version ${this.packageVersion} does not exist for the package ${this.packageName}`
                 );
-                return;
+
+                throw new Error(
+                    `The specified version ${this.packageVersion} does not exist for the package ${this.packageName}`
+                );
             }
 
             versionToUse = response;
@@ -74,8 +77,10 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
             );
 
             this.actionReporter.addGeneralError({
-                message: `Pre-requisite step failed: could not check if package version exists`
+                message: `${LoggerUtil.getErrorMessage(e)}`
             });
+
+            this.actionReporter.completeReport();
 
             return;
         }
@@ -127,9 +132,6 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                 continue;
             }
 
-            let repoPath: string;
-            let descriptorWithTree: GitTreeWithFileDescriptor;
-
             // Run for every fetched repository in the organization
             for await (const [
                 innerIndex,
@@ -140,6 +142,8 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                         this.gitRef ?? `heads/${repository.default_branch}`
                     }>`
                 ]);
+
+                let descriptorWithTree: GitTreeWithFileDescriptor;
 
                 try {
                     const findResults =
@@ -179,6 +183,8 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
 
                     continue;
                 }
+
+                let repoPath: string;
 
                 try {
                     const theRepoPath = await this.reinstallPackageForProject(
@@ -297,6 +303,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                         ref: this.gitRef ?? `heads/${repository.default_branch}`
                     }
                 );
+
                 descriptorWithContents.push({
                     content,
                     descriptor

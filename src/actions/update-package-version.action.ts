@@ -5,7 +5,7 @@ import {
     GitHubRepository,
     GitTreeItem
 } from '../utils/github.util';
-import { LogLevel } from '../utils/logger.util';
+import { LoggerUtil, LogLevel } from '../utils/logger.util';
 import { InstallModes, NpmUtil, PackageTypes } from '../utils/npm.util';
 import { GenericAction } from './generic.action';
 
@@ -48,38 +48,104 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             `Updating ${this.packageName} to version ${this.packageVersion}`
         ]);
 
+        let versionToUse: string;
+
         try {
             // Determine if the package version that we are trying to update to exists
-            const versionToUse = await this.npmUtil.doesPackageVersionExist(
+            const response = await this.npmUtil.doesPackageVersionExist(
                 this.packageName,
                 this.packageVersion
             );
 
             // If no such version for the package exists, then we stop processing here
-            if (!versionToUse) {
+            if (!response) {
                 this.logger.info(
                     `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
                     `The specified version ${this.packageVersion} does not exist for the package ${this.packageName}`
                 );
-                return;
+
+                throw new Error(
+                    `The specified version ${this.packageVersion} does not exist for the package ${this.packageName}`
+                );
             }
 
-            for await (const organization of this.organizations) {
-                const tmpDir =
-                    this.filesystemUtil.createSubdirectoryAtProjectRoot();
+            versionToUse = response;
+        } catch (e) {
+            this.logger.error(
+                `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+                `Internal error while running the operation.\n`,
+                e
+            );
 
-                const repositories =
+            this.actionReporter.addGeneralError({
+                message: `${LoggerUtil.getErrorMessage(e)}`
+            });
+
+            this.actionReporter.completeReport();
+
+            return;
+        }
+
+        for await (const [
+            index,
+            organization
+        ] of this.organizations.entries()) {
+            this.actionReporter.addSubHeader([
+                `[${index + 1}] Running for the organization ${organization}`
+            ]);
+
+            let repositories: Array<GitHubRepository>;
+
+            try {
+                repositories =
                     await this.listApplicableRepositoriesForOperation(
                         organization
                     );
+            } catch (e) {
+                this.logger.error(
+                    `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+                    `Failed to list repositories for the ${organization} organization\n`,
+                    e
+                );
 
-                for await (const repository of repositories) {
-                    this.actionReporter.addSubHeader([
-                        repository.full_name,
+                this.actionReporter.addGeneralError({
+                    message: `${LoggerUtil.getErrorMessage(e)}`
+                });
+
+                continue;
+            }
+
+            let tmpDir: string;
+            try {
+                tmpDir = this.filesystemUtil.createSubdirectoryAtProjectRoot();
+            } catch (e) {
+                this.logger.error(
+                    `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+                    `Failed to create temporary directory for operation\n`,
+                    e
+                );
+
+                this.actionReporter.addGeneralError({
+                    message: `${LoggerUtil.getErrorMessage(e)}`
+                });
+
+                continue;
+            }
+
+            for await (const [
+                innerIndex,
+                repository
+            ] of repositories.entries()) {
+                this.actionReporter.addSubHeader([
+                    `[${innerIndex + 1}] ${repository.full_name} <${
                         this.gitRef ?? `heads/${repository.default_branch}`
-                    ]);
+                    }>`
+                ]);
 
-                    const descriptorWithTree =
+                let descriptorWithTree: GitTreeWithFileDescriptor;
+
+                try {
+                    const findResults =
                         await this.githubUtil.findTreeAndDescriptorForFilePath(
                             repository,
                             [
@@ -89,76 +155,112 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                             this.gitRef ?? `heads/${repository.default_branch}`
                         );
 
-                    if (descriptorWithTree?.descriptors.length !== 2) {
+                    if (findResults?.descriptors.length !== 2) {
                         this.logger.warn(
                             `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-                            `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${
-                                NpmUtil.LOCKFILE_FILE_NAME
-                            } was not found in ${repository.name} <${
+                            `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME} was not found`
+                        );
+
+                        this.actionReporter.addSkipped({
+                            name: repository.full_name,
+                            reason: `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME} was not found`,
+                            ref:
                                 this.gitRef ??
                                 `heads/${repository.default_branch}`
-                            }>`
-                        );
+                        });
 
                         continue;
                     }
 
-                    const repoPath = await this.updatePackageVersionForProject(
-                        repository,
-                        descriptorWithTree.descriptors,
-                        tmpDir,
-                        versionToUse
-                    );
-
-                    // If no repo path is returned, something wrong happened and we should skip...
-                    if (!repoPath) {
-                        continue;
-                    }
-
-                    // Remove any file descriptors that match
-                    _.remove(descriptorWithTree.tree.tree, (treeItem) => {
-                        const shaMatch = _.find(
-                            descriptorWithTree.descriptors,
-                            (item) => item.sha === treeItem.sha
-                        );
-
-                        return shaMatch ? true : false;
+                    descriptorWithTree = findResults;
+                } catch (e) {
+                    this.actionReporter.addFailed({
+                        name: repository.full_name,
+                        reason: `${LoggerUtil.getErrorMessage(e)}`,
+                        ref: this.gitRef ?? `heads/${repository.default_branch}`
                     });
 
-                    try {
-                        await this.githubUtil.uploadToRepository(
-                            repoPath,
+                    continue;
+                }
+
+                let repoPath: string;
+
+                try {
+                    const theRepoPath =
+                        await this.updatePackageVersionForProject(
                             repository,
-                            `Update ${this.packageName} to version ${this.packageVersion}`,
-                            this.gitRef ?? `heads/${repository.default_branch}`,
-                            descriptorWithTree,
-                            {
-                                removeSubtrees: false, // set to false because we didnt obtain the tree recursively
-                                globOptions: {
-                                    deep: 1,
-                                    onlyFiles: true
-                                }
-                            }
+                            descriptorWithTree.descriptors,
+                            tmpDir,
+                            versionToUse
                         );
-                    } catch (e) {
-                        this.logger.warn(
-                            `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-                            `Failed to upload changes\n`,
-                            e
-                        );
+
+                    // If no repo path is returned, something wrong happened and we should skip...
+                    if (!theRepoPath) {
+                        this.actionReporter.addSkipped({
+                            name: repository.full_name,
+                            reason: `Package version update was not done`,
+                            ref:
+                                this.gitRef ??
+                                `heads/${repository.default_branch}`
+                        });
 
                         continue;
                     }
+
+                    repoPath = theRepoPath;
+                } catch (e) {
+                    this.actionReporter.addFailed({
+                        name: repository.full_name,
+                        reason: `${LoggerUtil.getErrorMessage(e)}`,
+                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    });
+
+                    continue;
                 }
 
-                this.filesystemUtil.removeDirectory(tmpDir);
+                // Remove any file descriptors that match
+                _.remove(descriptorWithTree.tree.tree, (treeItem) => {
+                    const shaMatch = _.find(
+                        descriptorWithTree.descriptors,
+                        (item) => item.sha === treeItem.sha
+                    );
+
+                    return shaMatch ? true : false;
+                });
+
+                try {
+                    await this.githubUtil.uploadToRepository(
+                        repoPath,
+                        repository,
+                        `Update ${this.packageName} to version ${this.packageVersion}`,
+                        this.gitRef ?? `heads/${repository.default_branch}`,
+                        descriptorWithTree,
+                        {
+                            removeSubtrees: false, // set to false because we didnt obtain the tree recursively
+                            globOptions: {
+                                deep: 1,
+                                onlyFiles: true
+                            }
+                        }
+                    );
+                } catch (e) {
+                    this.logger.warn(
+                        `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+                        `Failed to upload changes\n`,
+                        e
+                    );
+
+                    this.actionReporter.addFailed({
+                        name: repository.full_name,
+                        reason: `${LoggerUtil.getErrorMessage(e)}`,
+                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    });
+
+                    continue;
+                }
             }
-        } catch (e) {
-            this.logger.error(
-                `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-                `Internal error while running the operation.\n`,
-                e
-            );
+
+            this.filesystemUtil.removeDirectory(tmpDir);
         }
 
         this.actionReporter.completeReport();
@@ -184,6 +286,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
         };
 
         const descriptorWithContents: Array<DescriptorWithContents> = [];
+
         try {
             for await (const descriptor of descriptors) {
                 const content = await this.githubUtil.getFileDescriptorContent(
@@ -193,6 +296,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                         ref: this.gitRef ?? `heads/${repository.default_branch}`
                     }
                 );
+
                 descriptorWithContents.push({
                     content,
                     descriptor
@@ -205,6 +309,9 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 e
             );
 
+            // Don't throw an error because this is not an error in the execution itself
+            // but rather the nature of the repository which did not meet the criteria
+            // for this operation.
             return undefined;
         }
 
@@ -224,7 +331,9 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 `Failed to read ${NpmUtil.LOCKFILE_FILE_NAME} descriptor\n`,
                 e
             );
-            throw e;
+
+            // Its possible that a repo doesn't have a package-lock.json
+            return undefined;
         }
 
         let packageJsonDescriptorAndContent: DescriptorWithContents | undefined;
@@ -242,7 +351,9 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 `[${UpdatePackageVersionAction.CLASS_NAME}.updatePackageVersionForProject]`,
                 `Failed to read ${NpmUtil.PACKAGE_JSON_FILE_NAME} descriptor`
             );
-            throw e;
+
+            // Its possible that a repo doesn't have a package.json
+            return undefined;
         }
 
         if (!lockfileDescriptorAndContent || !packageJsonDescriptorAndContent) {
@@ -251,6 +362,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 `Failed to resolve content for ${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME}`
             );
 
+            // Don't throw an error here because it is possible that a repository may not have these files...
             return undefined;
         }
 
@@ -336,7 +448,9 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     npmCiResponse.response
                 );
 
-                return undefined;
+                throw new Error(
+                    `The command ${npmCiResponse.command} failed to execute`
+                );
             }
 
             const updatePackageResponse = await this.processorUtil.spawnProcess(
@@ -358,7 +472,9 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     updatePackageResponse.response
                 );
 
-                return undefined;
+                throw new Error(
+                    `The command ${updatePackageResponse.command} failed to execute`
+                );
             }
 
             // If a prepare script was removed in the above operation, add it back...
@@ -392,7 +508,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 e
             );
 
-            return undefined;
+            throw e;
         }
     }
 }

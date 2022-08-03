@@ -1,13 +1,10 @@
-import _ from 'lodash';
 import { GitOpsCommands } from '../index';
 import {
     FilesystemUtil,
     FilesystemWriteFileOptions
 } from '../utils/filesystem.util';
 import {
-    GitTreeWithFileDescriptor,
     GitHubRepository,
-    GithubUtil,
     GitTreeItem,
     FlattenedGitTree
 } from '../utils/github.util';

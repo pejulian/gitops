@@ -76,6 +76,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
             }
 
             let tmpDir: string;
+
             try {
                 tmpDir = this.filesystemUtil.createSubdirectoryAtProjectRoot();
             } catch (e) {
@@ -92,9 +93,6 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                 continue;
             }
 
-            let repoPath: string;
-            let descriptorWithTree: GitTreeWithFileDescriptor;
-
             // Run for every fetched repository in the organization
             for await (const [
                 innerIndex,
@@ -105,6 +103,8 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                         this.gitRef ?? `heads/${repository.default_branch}`
                     }>`
                 ]);
+
+                let descriptorWithTree: GitTreeWithFileDescriptor;
 
                 try {
                     const findResults =
@@ -144,6 +144,8 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
 
                     continue;
                 }
+
+                let repoPath: string;
 
                 try {
                     const theRepoPath = await this.uninstallPackageForProject(
