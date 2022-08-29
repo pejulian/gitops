@@ -95,10 +95,13 @@ export class GithubUtil {
         this.octokit = new Octokit({
             auth:
                 options?.githubToken ??
-                this.filesystemUtil.readFile(
-                    `${os.homedir()}/${
-                        options?.tokenFilePath ?? GithubUtil.GITHUB_TOKEN_PATH
-                    }`
+                encodeURIComponent(
+                    this.filesystemUtil.readFile(
+                        `${os.homedir()}/${
+                            options?.tokenFilePath ??
+                            GithubUtil.GITHUB_TOKEN_PATH
+                        }`
+                    ) ?? 'FILE_EXISTS_BUT_TOKEN_MISSING'
                 ),
             baseUrl: GithubUtil.GITHUB_API_BASE_PATH,
             request: { agent: new Agent({ rejectUnauthorized: false }) }

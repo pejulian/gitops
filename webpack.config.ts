@@ -3,7 +3,13 @@ import { resolve } from 'path';
 import TerserPlugin from 'terser-webpack-plugin';
 
 // top level await made possible with module es2022
-const packageJson = (await import('./package.json')).default;
+const packageJson = (
+    await import('./package.json', {
+        assert: {
+            type: 'json'
+        }
+    })
+).default;
 
 const plugins: webpack.Configuration['plugins'] = [
     new webpack.BannerPlugin({
