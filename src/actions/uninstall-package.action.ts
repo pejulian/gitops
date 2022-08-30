@@ -30,8 +30,9 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
             repositories: options.repositories,
-            gitRef: options.ref,
-            command: UninstallPackageAction.CLASS_NAME
+            ref: options.ref,
+            command: UninstallPackageAction.CLASS_NAME,
+            dryRun: options.dryRun
         });
 
         this.packageName = options.packageName;
@@ -51,7 +52,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
             organization
         ] of this.organizations.entries()) {
             this.actionReporter.addSubHeader([
-                `[${index + 1} | ${
+                `[${index + 1}|${
                     this.organizations.length
                 }] Running for the organization ${organization}`
             ]);
@@ -101,9 +102,9 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                 repository
             ] of repositories.entries()) {
                 this.actionReporter.addSubHeader([
-                    `[${innerIndex + 1} | ${repositories.length}] ${
+                    `[${innerIndex + 1}|${repositories.length}] ${
                         repository.full_name
-                    } <${this.gitRef ?? `heads/${repository.default_branch}`}>`
+                    } <${this.ref ?? `heads/${repository.default_branch}`}>`
                 ]);
 
                 let descriptorWithTree: GitTreeWithFileDescriptor;
@@ -116,7 +117,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                                 NpmUtil.PACKAGE_JSON_FILE_NAME,
                                 NpmUtil.LOCKFILE_FILE_NAME
                             ],
-                            this.gitRef ?? `heads/${repository.default_branch}`
+                            this.ref ?? `heads/${repository.default_branch}`
                         );
 
                     if (findResults?.descriptors.length !== 2) {
@@ -129,8 +130,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                             name: repository.full_name,
                             reason: `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME} was not found`,
                             ref:
-                                this.gitRef ??
-                                `heads/${repository.default_branch}`
+                                this.ref ?? `heads/${repository.default_branch}`
                         });
 
                         continue;
@@ -141,7 +141,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -162,8 +162,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                             name: repository.full_name,
                             reason: `Package uninstallation was not done`,
                             ref:
-                                this.gitRef ??
-                                `heads/${repository.default_branch}`
+                                this.ref ?? `heads/${repository.default_branch}`
                         });
 
                         continue;
@@ -174,7 +173,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -197,7 +196,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                         `Uninstall ${this.packageName} from ${
                             PackageTypes[this.packageType]
                         }`,
-                        this.gitRef ?? `heads/${repository.default_branch}`,
+                        this.ref ?? `heads/${repository.default_branch}`,
                         descriptorWithTree,
                         {
                             removeSubtrees: false, // set to false because we didnt obtain the tree recursively
@@ -217,7 +216,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -226,7 +225,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                 this.actionReporter.addSuccessful({
                     name: repository.full_name,
                     reason: `Uninstalled ${this.packageName} successfully`,
-                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    ref: this.ref ?? `heads/${repository.default_branch}`
                 });
             }
 
@@ -262,7 +261,7 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                     repository,
                     descriptor,
                     {
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     }
                 );
                 descriptorWithContents.push({

@@ -6,14 +6,46 @@ export const MODULE_VERSION = process.env.MODULE_VERSION ?? 'localhost';
 
 export type GitOpsCommands = {
     Common: Readonly<{
+        /**
+         * The list of organizations to work on
+         */
         organizations: Array<string>;
+        /**
+         * The raw github personal access token value to use.
+         * Will take precedence over `tokenFilePath` if defined.
+         */
         githubToken?: string;
+        /**
+         * The path to the github personal access token file that has been stored
+         * somewhere in the users' home directory.
+         *
+         * NOTE: The file must reside in the root or subdirectory OF THE USERS HOME DIRECTORY
+         */
         tokenFilePath?: string;
+        /**
+         * The log level to apply when making log statements
+         */
         logLevel: string;
+        /**
+         * The git reference to operate on for each repository
+         */
         ref?: string;
+        /**
+         * A regex of repos to consider for operations
+         */
         repositories?: string;
+        /**
+         * A list of repositories to consider (overrides repositories)
+         */
         repositoryList?: Array<string>;
+        /**
+         * A list of repositories to be excluded from consideration
+         */
         excludeRepositories?: Array<string>;
+        /**
+         * When true, perform the action without committing changes to Git
+         */
+        dryRun: boolean;
     }>;
     CommonPackageConstraints: Readonly<{
         packageUpdateConstraint?: string;

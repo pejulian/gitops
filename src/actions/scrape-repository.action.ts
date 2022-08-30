@@ -27,8 +27,9 @@ export class ScrapeRepositoryAction extends GenericAction<ScrapeRepositoryAction
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
             repositories: options.repositories,
-            gitRef: options.ref,
-            command: ScrapeRepositoryAction.CLASS_NAME
+            ref: options.ref,
+            command: ScrapeRepositoryAction.CLASS_NAME,
+            dryRun: options.dryRun
         });
     }
 

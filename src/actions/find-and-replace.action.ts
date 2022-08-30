@@ -32,8 +32,9 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
             repositories: options.repositories,
-            gitRef: options.ref,
-            command: FindAndReplaceAction.CLASS_NAME
+            ref: options.ref,
+            command: FindAndReplaceAction.CLASS_NAME,
+            dryRun: options.dryRun
         });
 
         this.filesToMatch = options.filesToMatch;
@@ -52,7 +53,7 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
             organization
         ] of this.organizations.entries()) {
             this.actionReporter.addSubHeader([
-                `[${index + 1} | ${
+                `[${index + 1}|${
                     this.organizations.length
                 }] Running for the organization ${organization}`
             ]);
@@ -83,9 +84,9 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                 repository
             ] of repositories.entries()) {
                 this.actionReporter.addSubHeader([
-                    `[${innerIndex + 1} | ${repositories.length}] ${
+                    `[${innerIndex + 1}|${repositories.length}] ${
                         repository.full_name
-                    } <${this.gitRef ?? `heads/${repository.default_branch}`}>`
+                    } <${this.ref ?? `heads/${repository.default_branch}`}>`
                 ]);
 
                 await this.findAndReplace(repository);
@@ -104,7 +105,7 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
         try {
             gitTree = await this.githubUtil.getRepositoryFullGitTree(
                 repository,
-                this.gitRef ?? `heads/${repository.default_branch}`,
+                this.ref ?? `heads/${repository.default_branch}`,
                 true
             );
         } catch (e) {
@@ -117,7 +118,7 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
             this.actionReporter.addFailed({
                 name: repository.full_name,
                 reason: `${LoggerUtil.getErrorMessage(e)}`,
-                ref: this.gitRef ?? `heads/${repository.default_branch}`
+                ref: this.ref ?? `heads/${repository.default_branch}`
             });
 
             return;
@@ -142,7 +143,7 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                     this.actionReporter.addSkipped({
                         name: repository.full_name,
                         reason: `The file ${fileToMatch} was not found`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -159,7 +160,7 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                 this.actionReporter.addSkipped({
                     name: repository.full_name,
                     reason: `Error finding file descriptor`,
-                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    ref: this.ref ?? `heads/${repository.default_branch}`
                 });
 
                 continue;
@@ -172,7 +173,7 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                     repository,
                     matchedDescriptor,
                     {
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     }
                 );
 
@@ -187,7 +188,7 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                 this.actionReporter.addSkipped({
                     name: repository.full_name,
                     reason: `Error getting file descriptor content`,
-                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    ref: this.ref ?? `heads/${repository.default_branch}`
                 });
 
                 continue;
@@ -207,7 +208,7 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                 this.actionReporter.addFailed({
                     name: repository.full_name,
                     reason: `Failed to create temporary directory for operation`,
-                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    ref: this.ref ?? `heads/${repository.default_branch}`
                 });
 
                 continue;
@@ -222,7 +223,7 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                 this.actionReporter.addFailed({
                     name: repository.full_name,
                     reason: `Matched file descriptor does not contain a path`,
-                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    ref: this.ref ?? `heads/${repository.default_branch}`
                 });
 
                 continue;
@@ -245,7 +246,9 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                 if (matches && matches.length > 0) {
                     this.logger.info(
                         `[${FindAndReplaceAction.CLASS_NAME}.findAndReplace]`,
-                        `Found ${matches.length} match(es) for ${this.searchFor} in ${matchedDescriptor.path}`
+                        `Found ${matches.length} ${
+                            matches.length === 1 ? `match` : `matches`
+                        } for ${this.searchFor} in ${matchedDescriptor.path}`
                     );
 
                     const replacedFileContent = fileContent.replace(
@@ -271,7 +274,7 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                             tmpDir,
                             repository,
                             `Find and replace ${this.searchFor} to ${this.replaceWith} in ${matchedDescriptor.path}`,
-                            this.gitRef ?? `heads/${repository.default_branch}`,
+                            this.ref ?? `heads/${repository.default_branch}`,
                             {
                                 descriptors: [matchedDescriptor],
                                 tree: gitTree
@@ -284,7 +287,7 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                     this.actionReporter.addSuccessful({
                         name: repository.full_name,
                         reason: `Completed: ${uploadResponse.ref}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
                 } else {
                     this.logger.info(
@@ -295,14 +298,14 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                     this.actionReporter.addSkipped({
                         name: repository.full_name,
                         reason: `No matches for ${this.searchFor} in ${matchedDescriptor.path}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
                 }
             } catch (e) {
                 this.actionReporter.addFailed({
                     name: repository.full_name,
                     reason: `${LoggerUtil.getErrorMessage(e)}`,
-                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    ref: this.ref ?? `heads/${repository.default_branch}`
                 });
 
                 continue;

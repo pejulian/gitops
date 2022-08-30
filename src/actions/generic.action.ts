@@ -5,53 +5,23 @@ import { NpmUtil } from '../utils/npm.util';
 import { ProcessorUtil } from '../utils/processsor.util';
 import { SemverUtil } from '../utils/semver.util';
 import { ActionReporter } from '../reporters/action.reporter';
+import { GitOpsCommands } from '..';
 
 export interface IGenericAction<T> {
     run(): Promise<T>;
 }
 
-export type GenericActionOptions = Readonly<{
-    /**
-     * The log level to apply when making log statements
-     */
-    logLevel?: LogLevel;
-    /**
-     * The raw github personal access token value to use.
-     * Will take precedence over `tokenFilePath` if defined.
-     */
-    githubToken?: string;
-    /**
-     * The path to the github personal access token file that has been stored
-     * somewhere in the users' home directory.
-     *
-     * NOTE: The file must reside in the root or subdirectory OF THE USERS HOME DIRECTORY
-     */
-    tokenFilePath?: string;
-    /**
-     * The list of organizations to work on
-     */
-    organizations: Array<string>;
-    /**
-     * A regex of repos to consider for operations
-     */
-    repositories?: string;
-    /**
-     * A list of repositories to consider (overrides repositories)
-     */
-    repositoryList?: Array<string>;
-    /**
-     * A list of repositories to be excluded from consideration
-     */
-    excludeRepositories?: Array<string>;
-    /**
-     * The git reference to operate on for each repository
-     */
-    gitRef?: string;
-    /**
-     * The command name being executed
-     */
-    command: string;
-}>;
+export type GenericActionOptions = Omit<GitOpsCommands['Common'], 'logLevel'> &
+    Readonly<{
+        /**
+         * The command name being executed
+         */
+        command: string;
+        /**
+         * The log level
+         */
+        logLevel: LogLevel;
+    }>;
 
 export abstract class GenericAction<T> implements IGenericAction<T> {
     protected static CLASS_NAME = 'GenericAction';
@@ -69,7 +39,8 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
     protected repositories: string | undefined;
     protected excludeRepositories: Array<string> | undefined;
     protected repositoryList: Array<string> | undefined;
-    protected gitRef: string | undefined;
+    protected ref: string | undefined;
+    protected dryRun: boolean;
 
     constructor(options: GenericActionOptions) {
         GenericAction.CLASS_NAME = options.command;
@@ -112,7 +83,8 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
         this.repositories = options.repositories;
         this.repositoryList = options.repositoryList;
         this.organizations = options.organizations;
-        this.gitRef = options.gitRef;
+        this.ref = options.ref;
+        this.dryRun = options.dryRun;
     }
 
     public async run(): Promise<T> {
@@ -146,7 +118,7 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
                 } repositories for ${organization}:\n${repositories
                     .map((repository, index) => {
                         return `[${index + 1}] ${repository.name} [${
-                            this.gitRef ?? `heads/${repository.default_branch}`
+                            this.ref ?? `heads/${repository.default_branch}`
                         }]`;
                     })
                     .join('\n')}`

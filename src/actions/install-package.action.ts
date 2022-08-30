@@ -29,8 +29,9 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
             repositories: options.repositories,
-            gitRef: options.ref,
-            command: InstallPackageAction.CLASS_NAME
+            ref: options.ref,
+            command: InstallPackageAction.CLASS_NAME,
+            dryRun: options.dryRun
         });
 
         this.packageName = options.packageName;
@@ -87,7 +88,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
             organization
         ] of this.organizations.entries()) {
             this.actionReporter.addSubHeader([
-                `[${index + 1} | ${
+                `[${index + 1}|${
                     this.organizations.length
                 }] Running for the organization ${organization}`
             ]);
@@ -136,9 +137,9 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                 repository
             ] of repositories.entries()) {
                 this.actionReporter.addSubHeader([
-                    `[${innerIndex + 1} | ${repositories.length}] ${
+                    `[${innerIndex + 1}|${repositories.length}] ${
                         repository.full_name
-                    } <${this.gitRef ?? `heads/${repository.default_branch}`}>`
+                    } <${this.ref ?? `heads/${repository.default_branch}`}>`
                 ]);
 
                 let descriptorWithTree: GitTreeWithFileDescriptor;
@@ -151,7 +152,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                                 NpmUtil.PACKAGE_JSON_FILE_NAME,
                                 NpmUtil.LOCKFILE_FILE_NAME
                             ],
-                            this.gitRef ?? `heads/${repository.default_branch}`
+                            this.ref ?? `heads/${repository.default_branch}`
                         );
 
                     if (findResults?.descriptors.length !== 2) {
@@ -164,8 +165,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                             name: repository.full_name,
                             reason: `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME} was not found`,
                             ref:
-                                this.gitRef ??
-                                `heads/${repository.default_branch}`
+                                this.ref ?? `heads/${repository.default_branch}`
                         });
 
                         continue;
@@ -176,7 +176,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -198,8 +198,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                             name: repository.full_name,
                             reason: `Package installation was not done`,
                             ref:
-                                this.gitRef ??
-                                `heads/${repository.default_branch}`
+                                this.ref ?? `heads/${repository.default_branch}`
                         });
 
                         continue;
@@ -210,7 +209,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -233,7 +232,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                         `Install ${this.packageName} with version ${
                             this.packageVersion
                         } in ${PackageTypes[this.packageType]}`,
-                        this.gitRef ?? `heads/${repository.default_branch}`,
+                        this.ref ?? `heads/${repository.default_branch}`,
                         descriptorWithTree,
                         {
                             removeSubtrees: false, // set to false because we didnt obtain the tree recursively
@@ -253,7 +252,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -262,7 +261,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                 this.actionReporter.addSuccessful({
                     name: repository.full_name,
                     reason: `Installed ${this.packageName} successfully`,
-                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    ref: this.ref ?? `heads/${repository.default_branch}`
                 });
             }
 
@@ -298,7 +297,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                     repository,
                     descriptor,
                     {
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     }
                 );
                 descriptorWithContents.push({

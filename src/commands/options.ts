@@ -1,6 +1,13 @@
 import { Option } from 'commander';
 import { LogLevel } from '../utils/logger.util';
 
+export const dryRunOption = new Option(
+    `-u, --dry-run`,
+    `When this flag is set, the action will be performed without committing the changes to the remote repository`
+)
+    .default(false)
+    .makeOptionMandatory(false);
+
 export const tokenFilePathOption = new Option(
     '-p, --token-file-path <value>',
     "[OPTIONAL] A path to the file in your user's home directory where the GitHub Personal Access Token is stored. Defaults to $HOME/c9-cli-token.txt"

@@ -30,8 +30,9 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
             repositories: options.repositories,
-            gitRef: options.ref,
-            command: RenameFileAction.CLASS_NAME
+            ref: options.ref,
+            command: RenameFileAction.CLASS_NAME,
+            dryRun: options.dryRun
         });
 
         this.targetFilePath = options.targetFilePath;
@@ -48,7 +49,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
             organization
         ] of this.organizations.entries()) {
             this.actionReporter.addSubHeader([
-                `[${index + 1} | ${
+                `[${index + 1}|${
                     this.organizations.length
                 }] Running for the organization ${organization}`
             ]);
@@ -81,16 +82,16 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                 repository
             ] of repositories.entries()) {
                 this.actionReporter.addSubHeader([
-                    `[${innerIndex + 1} | ${repositories.length}] ${
+                    `[${innerIndex + 1}|${repositories.length}] ${
                         repository.full_name
-                    } <${this.gitRef ?? `heads/${repository.default_branch}`}>`
+                    } <${this.ref ?? `heads/${repository.default_branch}`}>`
                 ]);
 
                 const findResults =
                     await this.githubUtil.findTreeAndDescriptorForFilePath(
                         repository,
                         [this.targetFilePath],
-                        this.gitRef ?? `heads/${repository.default_branch}`,
+                        this.ref ?? `heads/${repository.default_branch}`,
                         true
                     );
 
@@ -103,7 +104,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                     this.actionReporter.addSkipped({
                         name: repository.full_name,
                         reason: `The target file path ${this.targetFilePath} was not found`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -126,7 +127,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -146,7 +147,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
             repository,
             descriptorWithTree?.descriptors?.[0],
             {
-                ref: this.gitRef ?? `heads/${repository.default_branch}`
+                ref: this.ref ?? `heads/${repository.default_branch}`
             }
         );
 
@@ -188,7 +189,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
             tmpDir,
             repository,
             `Rename ${this.targetFilePath} to ${this.newFileName}`,
-            this.gitRef ?? `heads/${repository.default_branch}`,
+            this.ref ?? `heads/${repository.default_branch}`,
             modifiedDescriptorWithTree
         );
 

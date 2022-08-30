@@ -32,8 +32,9 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             repositoryList: options.repositoryList,
             repositories: options.repositories,
             excludeRepositories: options.excludeRepositories,
-            gitRef: options.ref,
-            command: UpdatePackageVersionAction.CLASS_NAME
+            ref: options.ref,
+            command: UpdatePackageVersionAction.CLASS_NAME,
+            dryRun: options.dryRun
         });
 
         this.packageName = options.packageName;
@@ -91,7 +92,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
             organization
         ] of this.organizations.entries()) {
             this.actionReporter.addSubHeader([
-                `[${index + 1} | ${
+                `[${index + 1}|${
                     this.organizations.length
                 }] Running for the organization ${organization}`
             ]);
@@ -139,9 +140,9 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 repository
             ] of repositories.entries()) {
                 this.actionReporter.addSubHeader([
-                    `[${innerIndex + 1} | ${repositories.length}] ${
+                    `[${innerIndex + 1}|${repositories.length}] ${
                         repository.full_name
-                    } <${this.gitRef ?? `heads/${repository.default_branch}`}>`
+                    } <${this.ref ?? `heads/${repository.default_branch}`}>`
                 ]);
 
                 let descriptorWithTree: GitTreeWithFileDescriptor;
@@ -154,7 +155,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                                 NpmUtil.PACKAGE_JSON_FILE_NAME,
                                 NpmUtil.LOCKFILE_FILE_NAME
                             ],
-                            this.gitRef ?? `heads/${repository.default_branch}`
+                            this.ref ?? `heads/${repository.default_branch}`
                         );
 
                     if (findResults?.descriptors.length !== 2) {
@@ -167,8 +168,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                             name: repository.full_name,
                             reason: `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME} was not found`,
                             ref:
-                                this.gitRef ??
-                                `heads/${repository.default_branch}`
+                                this.ref ?? `heads/${repository.default_branch}`
                         });
 
                         continue;
@@ -179,7 +179,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -202,8 +202,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                             name: repository.full_name,
                             reason: `Package version update was not done`,
                             ref:
-                                this.gitRef ??
-                                `heads/${repository.default_branch}`
+                                this.ref ?? `heads/${repository.default_branch}`
                         });
 
                         continue;
@@ -214,7 +213,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -235,7 +234,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                         repoPath,
                         repository,
                         `Update ${this.packageName} to version ${this.packageVersion}`,
-                        this.gitRef ?? `heads/${repository.default_branch}`,
+                        this.ref ?? `heads/${repository.default_branch}`,
                         descriptorWithTree,
                         {
                             removeSubtrees: false, // set to false because we didnt obtain the tree recursively
@@ -255,7 +254,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -295,7 +294,7 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     repository,
                     descriptor,
                     {
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     }
                 );
 

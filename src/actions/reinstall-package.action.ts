@@ -31,8 +31,9 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
             repositories: options.repositories,
-            gitRef: options.ref,
-            command: ReinstallPackageAction.CLASS_NAME
+            ref: options.ref,
+            command: ReinstallPackageAction.CLASS_NAME,
+            dryRun: options.dryRun
         });
 
         this.packageName = options.packageName;
@@ -91,7 +92,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
             organization
         ] of this.organizations.entries()) {
             this.actionReporter.addSubHeader([
-                `[${index + 1} | ${
+                `[${index + 1}|${
                     this.organizations.length
                 }] Running for the organization ${organization}`
             ]);
@@ -140,9 +141,9 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                 repository
             ] of repositories.entries()) {
                 this.actionReporter.addSubHeader([
-                    `[${innerIndex + 1} | ${repositories.length}] ${
+                    `[${innerIndex + 1}|${repositories.length}] ${
                         repository.full_name
-                    } <${this.gitRef ?? `heads/${repository.default_branch}`}>`
+                    } <${this.ref ?? `heads/${repository.default_branch}`}>`
                 ]);
 
                 let descriptorWithTree: GitTreeWithFileDescriptor;
@@ -155,7 +156,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                                 NpmUtil.PACKAGE_JSON_FILE_NAME,
                                 NpmUtil.LOCKFILE_FILE_NAME
                             ],
-                            this.gitRef ?? `heads/${repository.default_branch}`
+                            this.ref ?? `heads/${repository.default_branch}`
                         );
 
                     if (findResults?.descriptors.length !== 2) {
@@ -168,8 +169,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                             name: repository.full_name,
                             reason: `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME} was not found`,
                             ref:
-                                this.gitRef ??
-                                `heads/${repository.default_branch}`
+                                this.ref ?? `heads/${repository.default_branch}`
                         });
 
                         continue;
@@ -180,7 +180,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -202,8 +202,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                             name: repository.full_name,
                             reason: `Package reinstallation did not succeed`,
                             ref:
-                                this.gitRef ??
-                                `heads/${repository.default_branch}`
+                                this.ref ?? `heads/${repository.default_branch}`
                         });
 
                         continue;
@@ -214,7 +213,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -237,7 +236,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                         `Reinstall ${this.packageName} with version ${
                             this.packageVersion
                         } in ${PackageTypes[this.packageType]}`,
-                        this.gitRef ?? `heads/${repository.default_branch}`,
+                        this.ref ?? `heads/${repository.default_branch}`,
                         descriptorWithTree,
                         {
                             removeSubtrees: false, // set to false because we didnt obtain the tree recursively
@@ -257,7 +256,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -266,7 +265,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                 this.actionReporter.addSuccessful({
                     name: repository.full_name,
                     reason: `Reinstalled ${this.packageName} successfully`,
-                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    ref: this.ref ?? `heads/${repository.default_branch}`
                 });
             }
 
@@ -302,7 +301,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                     repository,
                     descriptor,
                     {
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     }
                 );
 

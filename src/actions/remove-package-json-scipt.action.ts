@@ -29,8 +29,9 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
             repositories: options.repositories,
-            gitRef: options.ref,
-            command: RemovePackageJsonScriptAction.CLASS_NAME
+            ref: options.ref,
+            command: RemovePackageJsonScriptAction.CLASS_NAME,
+            dryRun: options.dryRun
         });
 
         this.scriptKey = options.scriptKey;
@@ -47,7 +48,7 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
             organization
         ] of this.organizations.entries()) {
             this.actionReporter.addSubHeader([
-                `[${index + 1} | ${
+                `[${index + 1}|${
                     this.organizations.length
                 }] Running for the organization ${organization}`
             ]);
@@ -96,9 +97,9 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                 repository
             ] of repositories.entries()) {
                 this.actionReporter.addSubHeader([
-                    `[${innerIndex + 1} | ${repositories.length}] ${
+                    `[${innerIndex + 1}|${repositories.length}] ${
                         repository.full_name
-                    } <${this.gitRef ?? `heads/${repository.default_branch}`}>`
+                    } <${this.ref ?? `heads/${repository.default_branch}`}>`
                 ]);
 
                 let descriptorWithTree: GitTreeWithFileDescriptor;
@@ -111,7 +112,7 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                         await this.githubUtil.findTreeAndDescriptorForFilePath(
                             repository,
                             [NpmUtil.PACKAGE_JSON_FILE_NAME],
-                            this.gitRef ?? `heads/${repository.default_branch}`
+                            this.ref ?? `heads/${repository.default_branch}`
                         );
 
                     if (findResults?.descriptors.length !== 1) {
@@ -124,8 +125,7 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                             name: repository.full_name,
                             reason: `${NpmUtil.PACKAGE_JSON_FILE_NAME} not found`,
                             ref:
-                                this.gitRef ??
-                                `heads/${repository.default_branch}`
+                                this.ref ?? `heads/${repository.default_branch}`
                         });
 
                         continue;
@@ -136,7 +136,7 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -157,8 +157,7 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                             name: repository.full_name,
                             reason: `Script removal was not performed`,
                             ref:
-                                this.gitRef ??
-                                `heads/${repository.default_branch}`
+                                this.ref ?? `heads/${repository.default_branch}`
                         });
 
                         continue;
@@ -169,7 +168,7 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -190,7 +189,7 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                         repoPath,
                         repository,
                         `Removed "${this.scriptKey}" from "scripts" in ${NpmUtil.PACKAGE_JSON_FILE_NAME}`,
-                        this.gitRef ?? `heads/${repository.default_branch}`,
+                        this.ref ?? `heads/${repository.default_branch}`,
                         descriptorWithTree,
                         {
                             removeSubtrees: false, // set to false because we didnt obtain the tree recursively
@@ -210,7 +209,7 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                     this.actionReporter.addFailed({
                         name: repository.full_name,
                         reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
+                        ref: this.ref ?? `heads/${repository.default_branch}`
                     });
 
                     continue;
@@ -219,7 +218,7 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                 this.actionReporter.addSuccessful({
                     name: repository.full_name,
                     reason: `Removed ${this.scriptKey} successfully`,
-                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    ref: this.ref ?? `heads/${repository.default_branch}`
                 });
             }
 
@@ -254,7 +253,7 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                 repository,
                 descriptor,
                 {
-                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                    ref: this.ref ?? `heads/${repository.default_branch}`
                 }
             );
 
