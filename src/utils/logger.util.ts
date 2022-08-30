@@ -1,3 +1,4 @@
+import { MODULE_NAME, MODULE_VERSION } from '../index';
 import chalk from 'chalk';
 import lodash from 'lodash';
 import { Console } from 'console';
@@ -28,18 +29,14 @@ export class LoggerUtil {
         this._logLevel = logLevel;
         this._command = command;
 
-        this._stdOutFile = `${os.homedir()}/${
-            process.env.MODULE_NAME ?? 'gitops'
-        }-${process.env.MODULE_VERSION ?? 'localhost'}-${command}-${formatISO(
+        this._stdOutFile = `${os.homedir()}/${MODULE_NAME}-${MODULE_VERSION}-${command}-${formatISO(
             new Date(),
             {
                 format: 'basic'
             }
         )}-stdout.txt`;
 
-        this._stdErrFile = `${os.homedir()}/${
-            process.env.MODULE_NAME ?? 'gitops'
-        }-${process.env.MODULE_VERSION ?? 'localhost'}-${command}-${formatISO(
+        this._stdErrFile = `${os.homedir()}/${MODULE_NAME}-${MODULE_VERSION}-${command}-${formatISO(
             new Date(),
             {
                 format: 'basic'

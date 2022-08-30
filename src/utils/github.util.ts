@@ -5,6 +5,8 @@ import { Octokit, RestEndpointMethodTypes } from '@octokit/rest';
 import { operations, components } from '@octokit/openapi-types';
 
 import { Agent } from 'https';
+
+import { MODULE_NAME, MODULE_VERSION } from '../index';
 import { FilesystemUtil, GlobOptions } from './filesystem.util';
 import { LoggerUtil } from './logger.util';
 
@@ -92,19 +94,50 @@ export class GithubUtil {
 
         this.baseDir = options?.baseDir;
 
+        const pat = (
+            options?.githubToken ??
+            this.filesystemUtil.readFile(
+                `${os.homedir()}/${
+                    options?.tokenFilePath ?? GithubUtil.GITHUB_TOKEN_PATH
+                }`
+            )
+        )
+            ?.replace('\n', '')
+            ?.replace('\r', '')
+            ?.trim();
+
+        if (!pat) {
+            this.logger.error(
+                `[${GithubUtil.CLASS_NAME}.constructor]`,
+                `A valid GitHub Personal Access Token (PAT) is required to use this module.
+                
+                While it is true that some GitHub APIs can be accessed without authorization, it is not a recommended approach.
+                Furthermore, calls without authorization will be throttled more significantly than those with authorization.
+                Because this modules makes heavy use of GitHub APIs, it requires a valid token for authorization.
+                
+                To ensure you have a valid authorization token:
+
+                Either create a file called ${
+                    GithubUtil.GITHUB_TOKEN_PATH
+                } in your user home directory containing a valid PAT
+
+                OR
+
+                Supply a valid PAT via the command line argument --github-token
+                
+                To customize the file name and/or subdirectory path to a file containing your PAT, you can use the --token-file-path argument.
+                Please note however, that this path must STILL BE in your home directory ${os.homedir()}.
+                `
+            );
+
+            throw new Error('Missing GitHub Personal Access Token');
+        }
+
         this.octokit = new Octokit({
-            auth:
-                options?.githubToken ??
-                encodeURIComponent(
-                    this.filesystemUtil.readFile(
-                        `${os.homedir()}/${
-                            options?.tokenFilePath ??
-                            GithubUtil.GITHUB_TOKEN_PATH
-                        }`
-                    ) ?? 'FILE_EXISTS_BUT_TOKEN_MISSING'
-                ),
+            auth: pat,
             baseUrl: GithubUtil.GITHUB_API_BASE_PATH,
-            request: { agent: new Agent({ rejectUnauthorized: false }) }
+            request: { agent: new Agent({ rejectUnauthorized: false }) },
+            userAgent: `${MODULE_NAME} v${MODULE_VERSION}`
         });
     }
 
@@ -1476,56 +1509,58 @@ export class GithubUtil {
 //         onlyInclude: 'c9-stakeholder-service'
 //     });
 
-//     const ref = `heads/${repository.default_branch}`;
+//     console.log(repository);
 
-//     writeFileSync(
-//         `__mocks__/GitRepository.json`,
-//         JSON.stringify(repository, undefined, 4)
-//     );
+// const ref = `heads/${repository.default_branch}`;
 
-//     const gitReference = await gitUtil.getReference(repository, ref);
+// writeFileSync(
+//     `__mocks__/GitRepository.json`,
+//     JSON.stringify(repository, undefined, 4)
+// );
 
-//     writeFileSync(
-//         `__mocks__/GitReference.json`,
-//         JSON.stringify(gitReference, undefined, 4)
-//     );
+// const gitReference = await gitUtil.getReference(repository, ref);
 
-//     const gitTree = await gitUtil.getTree(repository, ref);
+// writeFileSync(
+//     `__mocks__/GitReference.json`,
+//     JSON.stringify(gitReference, undefined, 4)
+// );
 
-//     writeFileSync(
-//         `__mocks__/GitTree.json`,
-//         JSON.stringify(gitTree, undefined, 4)
-//     );
+// const gitTree = await gitUtil.getTree(repository, ref);
 
-//     const gitTreeHierachy = await gitUtil.getRepositoryFullGitTree(
-//         repository,
-//         ref
-//     );
+// writeFileSync(
+//     `__mocks__/GitTree.json`,
+//     JSON.stringify(gitTree, undefined, 4)
+// );
 
-//     writeFileSync(
-//         `__mocks__/GitTreeHierachy.json`,
-//         JSON.stringify(gitTreeHierachy, undefined, 4)
-//     );
+// const gitTreeHierachy = await gitUtil.getRepositoryFullGitTree(
+//     repository,
+//     ref
+// );
 
-//     const pathParts = FilesystemUtil.getPathParts(
-//         'src\\v1\\DOCUMENTATION_V1.md'
-//     );
+// writeFileSync(
+//     `__mocks__/GitTreeHierachy.json`,
+//     JSON.stringify(gitTreeHierachy, undefined, 4)
+// );
 
-//     const match = GithubUtil.findInGitTreeHierarchy(pathParts, gitTreeHierachy);
+// const pathParts = FilesystemUtil.getPathParts(
+//     'src\\v1\\DOCUMENTATION_V1.md'
+// );
 
-//     writeFileSync(
-//         `__mocks__/FindInGitTreeHierarchy.json`,
-//         JSON.stringify(match, undefined, 4)
-//     );
+// const match = GithubUtil.findInGitTreeHierarchy(pathParts, gitTreeHierachy);
 
-//     const flattenedGitTreeHierachy = await gitUtil.getRepositoryFullGitTree(
-//         repository,
-//         ref,
-//         true
-//     );
+// writeFileSync(
+//     `__mocks__/FindInGitTreeHierarchy.json`,
+//     JSON.stringify(match, undefined, 4)
+// );
 
-//     writeFileSync(
-//         `__mocks__/FlattenedGitTreeHierachy.json`,
-//         JSON.stringify(flattenedGitTreeHierachy, undefined, 4)
-//     );
+// const flattenedGitTreeHierachy = await gitUtil.getRepositoryFullGitTree(
+//     repository,
+//     ref,
+//     true
+// );
+
+// writeFileSync(
+//     `__mocks__/FlattenedGitTreeHierachy.json`,
+//     JSON.stringify(flattenedGitTreeHierachy, undefined, 4)
+// );
 // })();

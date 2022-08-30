@@ -48,7 +48,9 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
             organization
         ] of this.organizations.entries()) {
             this.actionReporter.addSubHeader([
-                `[${index + 1}] Running for the organization ${organization}`
+                `[${index + 1} | ${
+                    this.organizations.length
+                }] Running for the organization ${organization}`
             ]);
 
             let repositories: Array<GitHubRepository>;
@@ -79,9 +81,9 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                 repository
             ] of repositories.entries()) {
                 this.actionReporter.addSubHeader([
-                    `[${innerIndex + 1}] ${repository.full_name} <${
-                        this.gitRef ?? `heads/${repository.default_branch}`
-                    }>`
+                    `[${innerIndex + 1} | ${repositories.length}] ${
+                        repository.full_name
+                    } <${this.gitRef ?? `heads/${repository.default_branch}`}>`
                 ]);
 
                 const findResults =

@@ -113,3 +113,20 @@ export const filesToMatchOption = new Option(
     `--files-to-match [value...]`,
     `An array of regexes that will be used to match files in the repository`
 );
+
+export const scriptKeyOption = new Option(
+    `-k, --script-key <value>`,
+    `The key for a script in the "scripts" section of "package.json"`
+).makeOptionMandatory(true);
+
+export const scriptValueOption = new Option(
+    `-a, --script-value <value>`,
+    `The value for a script in the "scripts" section of "package.json"`
+).makeOptionMandatory(true);
+
+export const overrideExistingScriptKeyOption = new Option(
+    `-d, --override-existing-script-key`,
+    `If specified, relevant operaations will override existing keys if found in the "scripts" section of "package.json"`
+)
+    .makeOptionMandatory(false)
+    .default(false);

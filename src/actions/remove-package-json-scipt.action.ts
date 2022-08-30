@@ -5,21 +5,21 @@ import {
     GitTreeWithFileDescriptor
 } from '../utils/github.util';
 import { LoggerUtil, LogLevel } from '../utils/logger.util';
-import { InstallModes, NpmUtil, PackageTypes } from '../utils/npm.util';
+import { NpmUtil } from '../utils/npm.util';
 import { GenericAction } from './generic.action';
 import _ from 'lodash';
 
-export type InstallPackageActionOptions = GitOpsCommands['InstallPackage'];
+export type RemovePackageJsonScriptActionOptions =
+    GitOpsCommands['RemovePackageJsonScript'];
 
-export type InstallPackageActionResponse = void;
+export type RemovePackageJsonScriptActionResponse = void;
 
-export class InstallPackageAction extends GenericAction<InstallPackageActionResponse> {
-    private packageName: string;
-    private packageVersion: string;
-    private packageType: InstallPackageActionOptions['packageType'];
+export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJsonScriptActionResponse> {
+    private scriptKey: string;
 
-    constructor(options: InstallPackageActionOptions) {
-        InstallPackageAction.CLASS_NAME = 'InstallPackageAction';
+    constructor(options: RemovePackageJsonScriptActionOptions) {
+        RemovePackageJsonScriptAction.CLASS_NAME =
+            'RemovePackageJsonScriptAction';
 
         super({
             githubToken: options.githubToken,
@@ -30,56 +30,16 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
             excludeRepositories: options.excludeRepositories,
             repositories: options.repositories,
             gitRef: options.ref,
-            command: InstallPackageAction.CLASS_NAME
+            command: RemovePackageJsonScriptAction.CLASS_NAME
         });
 
-        this.packageName = options.packageName;
-        this.packageVersion = options.packageVersion;
-        this.packageType = options.packageType;
+        this.scriptKey = options.scriptKey;
     }
 
-    public async run(): Promise<InstallPackageActionResponse> {
+    public async run(): Promise<RemovePackageJsonScriptActionResponse> {
         this.actionReporter.startReport(this.organizations, [
-            `Installing ${this.packageName} with version ${this.packageVersion}`
+            `Removing ${this.scriptKey} from "scripts" section of "${NpmUtil.PACKAGE_JSON_FILE_NAME}"`
         ]);
-
-        let versionToUse: string;
-
-        try {
-            // Determine if the package version that we are trying to reinstall exists
-            const response = await this.npmUtil.doesPackageVersionExist(
-                this.packageName,
-                this.packageVersion
-            );
-
-            // If no such version for the package exists, then we stop processing here
-            if (!response) {
-                this.logger.info(
-                    `[${InstallPackageAction.CLASS_NAME}.run]`,
-                    `The specified version ${this.packageVersion} does not exist for the package ${this.packageName}`
-                );
-
-                throw new Error(
-                    `The specified version ${this.packageVersion} does not exist for the package ${this.packageName}`
-                );
-            }
-
-            versionToUse = response;
-        } catch (e) {
-            this.logger.error(
-                `[${InstallPackageAction.CLASS_NAME}.run]`,
-                `Failed to check if package version exists.\n`,
-                e
-            );
-
-            this.actionReporter.addGeneralError({
-                message: `${LoggerUtil.getErrorMessage(e)}`
-            });
-
-            this.actionReporter.completeReport();
-
-            return;
-        }
 
         // Run for every given organization
         for await (const [
@@ -101,7 +61,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                     );
             } catch (e) {
                 this.logger.error(
-                    `[${InstallPackageAction.CLASS_NAME}.run]`,
+                    `[${RemovePackageJsonScriptAction.CLASS_NAME}.run]`,
                     `Failed to list repositories for the ${organization} organization\n`,
                     e
                 );
@@ -118,7 +78,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                 tmpDir = this.filesystemUtil.createSubdirectoryAtProjectRoot();
             } catch (e) {
                 this.logger.error(
-                    `[${InstallPackageAction.CLASS_NAME}.run]`,
+                    `[${RemovePackageJsonScriptAction.CLASS_NAME}.run]`,
                     `Failed to create temporary directory for operation\n`,
                     e
                 );
@@ -143,26 +103,26 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
 
                 let descriptorWithTree: GitTreeWithFileDescriptor;
 
+                /**
+                 * Find package.json
+                 */
                 try {
                     const findResults =
                         await this.githubUtil.findTreeAndDescriptorForFilePath(
                             repository,
-                            [
-                                NpmUtil.PACKAGE_JSON_FILE_NAME,
-                                NpmUtil.LOCKFILE_FILE_NAME
-                            ],
+                            [NpmUtil.PACKAGE_JSON_FILE_NAME],
                             this.gitRef ?? `heads/${repository.default_branch}`
                         );
 
-                    if (findResults?.descriptors.length !== 2) {
+                    if (findResults?.descriptors.length !== 1) {
                         this.logger.warn(
-                            `[${InstallPackageAction.CLASS_NAME}.run]`,
-                            `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME} was not found`
+                            `[${RemovePackageJsonScriptAction.CLASS_NAME}.run]`,
+                            `${NpmUtil.PACKAGE_JSON_FILE_NAME} not found`
                         );
 
                         this.actionReporter.addSkipped({
                             name: repository.full_name,
-                            reason: `${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME} was not found`,
+                            reason: `${NpmUtil.PACKAGE_JSON_FILE_NAME} not found`,
                             ref:
                                 this.gitRef ??
                                 `heads/${repository.default_branch}`
@@ -185,18 +145,17 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                 let repoPath: string;
 
                 try {
-                    const theRepoPath = await this.installPackageForProject(
+                    const theRepoPath = await this.removeScriptFromPackageJson(
                         repository,
-                        descriptorWithTree.descriptors,
-                        tmpDir,
-                        versionToUse
+                        descriptorWithTree.descriptors[0],
+                        tmpDir
                     );
 
                     // If no repo path is returned, something wrong happened and we should skip...
                     if (!theRepoPath) {
                         this.actionReporter.addSkipped({
                             name: repository.full_name,
-                            reason: `Package installation was not done`,
+                            reason: `Script removal was not performed`,
                             ref:
                                 this.gitRef ??
                                 `heads/${repository.default_branch}`
@@ -230,9 +189,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                     await this.githubUtil.uploadToRepository(
                         repoPath,
                         repository,
-                        `Install ${this.packageName} with version ${
-                            this.packageVersion
-                        } in ${PackageTypes[this.packageType]}`,
+                        `Removed "${this.scriptKey}" from "scripts" in ${NpmUtil.PACKAGE_JSON_FILE_NAME}`,
                         this.gitRef ?? `heads/${repository.default_branch}`,
                         descriptorWithTree,
                         {
@@ -245,7 +202,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                     );
                 } catch (e) {
                     this.logger.warn(
-                        `[${InstallPackageAction.CLASS_NAME}.run]`,
+                        `[${RemovePackageJsonScriptAction.CLASS_NAME}.run]`,
                         `Failed to commit changes\n`,
                         e
                     );
@@ -261,7 +218,7 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
 
                 this.actionReporter.addSuccessful({
                     name: repository.full_name,
-                    reason: `Installed ${this.packageName} successfully`,
+                    reason: `Removed ${this.scriptKey} successfully`,
                     ref: this.gitRef ?? `heads/${repository.default_branch}`
                 });
             }
@@ -272,11 +229,10 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
         this.actionReporter.completeReport();
     }
 
-    public async installPackageForProject(
+    public async removeScriptFromPackageJson(
         repository: GitHubRepository,
-        descriptors: GitTreeWithFileDescriptor['descriptors'],
-        tmpDir: string,
-        versionToUse: string
+        descriptor: GitTreeItem,
+        tmpDir: string
     ): Promise<string | undefined> {
         const orgPath = this.filesystemUtil.createFolder(
             `${tmpDir}/${repository.owner.login}`
@@ -291,25 +247,25 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
             descriptor: GitTreeItem;
         };
 
-        const descriptorWithContents: Array<DescriptorWithContents> = [];
+        // Get file descriptor and content
+        let descriptorWithContents: DescriptorWithContents;
         try {
-            for await (const descriptor of descriptors) {
-                const content = await this.githubUtil.getFileDescriptorContent(
-                    repository,
-                    descriptor,
-                    {
-                        ref: this.gitRef ?? `heads/${repository.default_branch}`
-                    }
-                );
-                descriptorWithContents.push({
-                    content,
-                    descriptor
-                });
-            }
+            const content = await this.githubUtil.getFileDescriptorContent(
+                repository,
+                descriptor,
+                {
+                    ref: this.gitRef ?? `heads/${repository.default_branch}`
+                }
+            );
+
+            descriptorWithContents = {
+                content,
+                descriptor
+            };
         } catch (e) {
             this.logger.error(
-                `[${InstallPackageAction.CLASS_NAME}.installPackageForProject]`,
-                `Failed to obtain file contents for descriptors\n`,
+                `[${RemovePackageJsonScriptAction.CLASS_NAME}.removeScriptFromPackageJson]`,
+                `Failed to obtain file content for descriptor\n`,
                 e
             );
 
@@ -319,40 +275,19 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
             return undefined;
         }
 
-        let lockfileDescriptorAndContent: DescriptorWithContents | undefined;
-
-        try {
-            lockfileDescriptorAndContent = _.find(
-                descriptorWithContents,
-                (item) =>
-                    item.descriptor.path?.includes(
-                        NpmUtil.LOCKFILE_FILE_NAME
-                    ) ?? false
-            );
-        } catch (e) {
-            this.logger.error(
-                `[${InstallPackageAction.CLASS_NAME}.installPackageForProject]`,
-                `Failed to read ${NpmUtil.LOCKFILE_FILE_NAME} descriptor\n`,
-                e
-            );
-
-            // Its possible that a repo doesn't have a package-lock.json
-            return undefined;
-        }
-
+        // Verify file descriptor and content
         let packageJsonDescriptorAndContent: DescriptorWithContents | undefined;
-
         try {
-            packageJsonDescriptorAndContent = _.find(
-                descriptorWithContents,
-                (item) =>
-                    item.descriptor.path?.includes(
-                        NpmUtil.PACKAGE_JSON_FILE_NAME
-                    ) ?? false
-            );
+            if (
+                descriptorWithContents.descriptor.path?.includes(
+                    NpmUtil.PACKAGE_JSON_FILE_NAME
+                )
+            ) {
+                packageJsonDescriptorAndContent = descriptorWithContents;
+            }
         } catch (e) {
             this.logger.error(
-                `[${InstallPackageAction.CLASS_NAME}.installPackageForProject]`,
+                `[${RemovePackageJsonScriptAction.CLASS_NAME}.removeScriptFromPackageJson]`,
                 `Failed to read ${NpmUtil.PACKAGE_JSON_FILE_NAME} descriptor`
             );
 
@@ -360,98 +295,49 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
             return undefined;
         }
 
-        if (!lockfileDescriptorAndContent || !packageJsonDescriptorAndContent) {
+        if (!packageJsonDescriptorAndContent) {
             this.logger.error(
-                `[${InstallPackageAction.CLASS_NAME}.installPackageForProject]`,
-                `Failed to resolve content for ${NpmUtil.PACKAGE_JSON_FILE_NAME} and ${NpmUtil.LOCKFILE_FILE_NAME}`
+                `[${RemovePackageJsonScriptAction.CLASS_NAME}.removeScriptFromPackageJson]`,
+                `Failed to read content for ${NpmUtil.PACKAGE_JSON_FILE_NAME}`
             );
 
-            // It's possible that a repo doesn't have a package-lock.json or package.json file
+            // Don't throw an error here because it is possible that a repository may not have these files...
             return undefined;
         }
-
-        this.filesystemUtil.writeFile(
-            `${repoPath}/${lockfileDescriptorAndContent.descriptor.path}`,
-            lockfileDescriptorAndContent.content,
-            {
-                encoding: 'utf8'
-            }
-        );
 
         try {
             const maybePackageJson = this.npmUtil.parsePackageJson(
                 packageJsonDescriptorAndContent.content
             );
 
-            // Remove any prepare scripts that might mess up this limited checkout and install
-            const { packageJson, prepareScript } =
-                this.npmUtil.removePrepareScript(maybePackageJson, {
-                    removeOnlyWhen: {
-                        keyword: 'husky'
-                    }
-                });
+            // Remove the script if its key is found in the scripts section of package.json
+            const modifiedPackageJson = this.npmUtil.removeScript(
+                maybePackageJson,
+                this.scriptKey
+            );
+
+            if (typeof modifiedPackageJson === 'boolean') {
+                this.logger.info(
+                    `[${RemovePackageJsonScriptAction.CLASS_NAME}.removeScriptFromPackageJson]`,
+                    `No changes were made to ${NpmUtil.PACKAGE_JSON_FILE_NAME}`
+                );
+
+                return;
+            }
 
             this.filesystemUtil.writeFile(
                 `${repoPath}/${packageJsonDescriptorAndContent.descriptor.path}`,
-                `${JSON.stringify(packageJson, undefined, 4)}\n`,
+                `${JSON.stringify(modifiedPackageJson, undefined, 4)}\n`,
                 {
                     encoding: 'utf8'
                 }
             );
 
-            const installPackageResponse =
-                await this.processorUtil.spawnProcess(
-                    `npm`,
-                    [
-                        'install',
-                        `${this.packageName}@${versionToUse}`,
-                        `${InstallModes[this.packageType]}`
-                    ],
-                    {
-                        cwd: repoPath
-                    }
-                );
-
-            if (installPackageResponse.code !== 0) {
-                this.logger.error(
-                    `[${InstallPackageAction.CLASS_NAME}.installPackageForProject]`,
-                    `The command ${installPackageResponse.command} failed to execute\n`,
-                    installPackageResponse.response
-                );
-
-                throw new Error(
-                    `The command ${installPackageResponse.command} failed to execute`
-                );
-            }
-
-            // If a prepare script was removed in the above operation, add it back...
-            if (prepareScript) {
-                const updatedPackageJson = this.filesystemUtil.readFile(
-                    `${repoPath}/${packageJsonDescriptorAndContent.descriptor.path}`
-                );
-
-                const parsedUpdatedPackageJson =
-                    this.npmUtil.parsePackageJson(updatedPackageJson);
-
-                const restoredPackageJson = this.npmUtil.restorePrepareScript(
-                    parsedUpdatedPackageJson,
-                    prepareScript
-                );
-
-                this.filesystemUtil.writeFile(
-                    `${repoPath}/${packageJsonDescriptorAndContent.descriptor.path}`,
-                    `${JSON.stringify(restoredPackageJson, undefined, 4)}\n`,
-                    {
-                        encoding: 'utf8'
-                    }
-                );
-            }
-
             return repoPath;
         } catch (e) {
             this.logger.error(
-                `[${InstallPackageAction.CLASS_NAME}.installPackageForProject]`,
-                `Installation of ${this.packageName} failed\n`,
+                `[${RemovePackageJsonScriptAction.CLASS_NAME}.removeScriptFromPackageJson]`,
+                `Removal of script with key "${this.scriptKey}" failed\n`,
                 e
             );
 

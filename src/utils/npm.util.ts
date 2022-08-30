@@ -424,6 +424,114 @@ export class NpmUtil {
     }
 
     /**
+     * Adds the specified script to the scripts section of package.json
+     *
+     * @param packageJson The package.json file to work on
+     * @param scriptKey The script key to add to the scripts section of package.json
+     * @param scriptValue The key to match and remove from the scripts section of package.json
+     * @returns
+     */
+    public addScript(
+        packageJson: Record<string, unknown>,
+        scriptKey: string,
+        scriptValue: string,
+        options: Readonly<{
+            overrideExistingScriptKey: boolean;
+        }> = {
+            overrideExistingScriptKey: false
+        }
+    ): Record<string, unknown> | boolean {
+        if (!NpmUtil.isPackageJson(packageJson)) {
+            throw new Error(
+                `The given file content is not a valid ${NpmUtil.PACKAGE_JSON_FILE_NAME} file`
+            );
+        }
+
+        const { scripts, ...rest } = packageJson;
+
+        if (scripts) {
+            const keys = Object.keys(scripts);
+
+            if (keys.includes(scriptKey)) {
+                if (options.overrideExistingScriptKey) {
+                    this.logger.warn(
+                        `[${NpmUtil.CLASS_NAME}.addScript]`,
+                        `Overriding existing key "${scriptKey}"`
+                    );
+                } else {
+                    this.logger.warn(
+                        `[${NpmUtil.CLASS_NAME}.addScript]`,
+                        `Won't override existing key "${scriptKey}" in "scripts"`
+                    );
+
+                    return false;
+                }
+            }
+
+            return {
+                ...rest,
+                scripts: {
+                    ...scripts,
+                    [scriptKey]: scriptValue
+                }
+            };
+        } else {
+            return {
+                ...rest,
+                scripts: {
+                    [scriptKey]: scriptValue
+                }
+            };
+        }
+    }
+
+    /**
+     * Removes the specified script by key if found in the scripts section of package.json
+     *
+     * @param packageJson The package.json file to work on
+     * @param scriptKey The key to match and remove from the scripts section of package.json
+     * @returns
+     */
+    public removeScript(
+        packageJson: Record<string, unknown>,
+        scriptKey: string
+    ): Record<string, unknown> | boolean {
+        if (!NpmUtil.isPackageJson(packageJson)) {
+            throw new Error(
+                `The given file content is not a valid ${NpmUtil.PACKAGE_JSON_FILE_NAME} file`
+            );
+        }
+
+        const { scripts, ...rest } = packageJson;
+
+        if (scripts) {
+            const keys = Object.keys(scripts);
+
+            if (keys.includes(scriptKey)) {
+                this.logger.info(
+                    `[${NpmUtil.CLASS_NAME}.removeScript]`,
+                    `Excluding matched key "${scriptKey}" in scripts`
+                );
+
+                const scriptsWithoutScriptKey = Object.fromEntries(
+                    Object.entries(scripts).filter(([key, value]) => {
+                        if (key !== scriptKey) {
+                            return value;
+                        }
+                    })
+                );
+
+                return {
+                    ...rest,
+                    scripts: scriptsWithoutScriptKey
+                };
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Removes the prepare script from the package.json content if available.
      *
      * Optionally, remove the prepare script only if it contains a certain keyword.

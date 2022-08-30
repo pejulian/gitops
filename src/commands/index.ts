@@ -6,6 +6,8 @@ import { createCommand as renameFileCommand } from './rename-file.command';
 import { createCommand as updatePackageVersionCommand } from './update-package-version.command';
 import { createCommand as scrapeRepositoryCommand } from './scrape-repository.command';
 import { createCommand as findAndReplaceCommand } from './find-and-replace.command';
+import { createCommand as removePackageJsonScriptCommand } from './remove-package-json-script.command';
+import { createCommand as addPackageJsonScriptCommand } from './add-package-json-script.command';
 
 export const createCommands = (program: Command) => {
     installPackageCommand(program);
@@ -15,4 +17,6 @@ export const createCommands = (program: Command) => {
     updatePackageVersionCommand(program);
     scrapeRepositoryCommand(program);
     findAndReplaceCommand(program);
+    removePackageJsonScriptCommand(program);
+    addPackageJsonScriptCommand(program);
 };

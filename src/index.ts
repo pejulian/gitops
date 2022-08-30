@@ -1,6 +1,9 @@
 import { Command } from 'commander';
 import { createCommands } from './commands';
 
+export const MODULE_NAME = process.env.MODULE_NAME ?? 'gitops';
+export const MODULE_VERSION = process.env.MODULE_VERSION ?? 'localhost';
+
 export type GitOpsCommands = {
     Common: Readonly<{
         organizations: Array<string>;
@@ -55,14 +58,26 @@ export type GitOpsCommands = {
         filesToMatch: Array<string>;
     }> &
         GitOpsCommands['Common'];
+    RemovePackageJsonScript: Readonly<{
+        scriptKey: string;
+    }> &
+        GitOpsCommands['Common'];
+    AddPackageJsonScript: Readonly<{
+        scriptKey: string;
+        scriptValue: string;
+        overrideExistingScriptKey: boolean;
+    }> &
+        GitOpsCommands['Common'];
 };
+
+console.log(`\n${MODULE_NAME} v${MODULE_VERSION}\n`);
 
 const program = new Command();
 
 program
-    .name(process.env.MODULE_NAME ?? 'gitops')
-    .summary(process.env.MODULE_DESCRIPTION ?? 'gitops')
-    .version(process.env.MODULE_VERSION ?? 'localhost')
+    .name(MODULE_NAME)
+    .summary(process.env.MODULE_DESCRIPTION ?? MODULE_NAME)
+    .version(MODULE_VERSION)
     .showHelpAfterError(true);
 
 createCommands(program);
