@@ -16,17 +16,17 @@ export type ActionReporterOptions = Readonly<{
 }>;
 
 export class ActionReporter {
-    private successfulRepositories: Array<RepositoryOutcome>;
-    private skippedRepositories: Array<RepositoryOutcome>;
-    private failedRepositories: Array<RepositoryOutcome>;
+    private successfulOperations: Array<RepositoryOutcome>;
+    private skippedOperations: Array<RepositoryOutcome>;
+    private failedOperations: Array<RepositoryOutcome>;
     private generalErrors: Array<GeneralOutcome>;
 
     private logger: LoggerUtil;
 
     constructor(options: ActionReporterOptions) {
-        this.skippedRepositories = [];
-        this.failedRepositories = [];
-        this.successfulRepositories = [];
+        this.skippedOperations = [];
+        this.failedOperations = [];
+        this.successfulOperations = [];
         this.generalErrors = [];
 
         this.logger = options.logger;
@@ -49,15 +49,15 @@ export class ActionReporter {
     }
 
     public addSkipped(attrs: RepositoryOutcome): void {
-        this.skippedRepositories.push(attrs);
+        this.skippedOperations.push(attrs);
     }
 
     public addFailed(attrs: RepositoryOutcome): void {
-        this.failedRepositories.push(attrs);
+        this.failedOperations.push(attrs);
     }
 
     public addSuccessful(attrs: RepositoryOutcome): void {
-        this.successfulRepositories.push(attrs);
+        this.successfulOperations.push(attrs);
     }
 
     public completeReport() {
@@ -70,10 +70,10 @@ export class ActionReporter {
             ]);
         }
 
-        if (this.successfulRepositories.length > 0) {
+        if (this.successfulOperations.length > 0) {
             this.addSubHeader([
-                `Successfully updated repositories`,
-                ...this.successfulRepositories.map((report, index) => {
+                `Successfully executed ${this.successfulOperations.length} operations`,
+                ...this.successfulOperations.map((report, index) => {
                     return `[${index + 1}] ${report.name} <${report.ref}> : ${
                         report.reason
                     }`;
@@ -81,10 +81,10 @@ export class ActionReporter {
             ]);
         }
 
-        if (this.skippedRepositories.length > 0) {
+        if (this.skippedOperations.length > 0) {
             this.addSubHeader([
-                `Skipped repositories`,
-                ...this.skippedRepositories.map((report, index) => {
+                `Skipped ${this.skippedOperations.length} operations`,
+                ...this.skippedOperations.map((report, index) => {
                     return `[${index + 1}] ${report.name} <${report.ref}> : ${
                         report.reason
                     }`;
@@ -92,10 +92,10 @@ export class ActionReporter {
             ]);
         }
 
-        if (this.failedRepositories.length > 0) {
+        if (this.failedOperations.length > 0) {
             this.addSubHeader([
-                `Failed operation`,
-                ...this.failedRepositories.map((report, index) => {
+                `Failed to execute ${this.failedOperations.length} operations`,
+                ...this.failedOperations.map((report, index) => {
                     return `[${index + 1}] ${report.name} <${report.ref}> : ${
                         report.reason
                     }`;

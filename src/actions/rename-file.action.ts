@@ -185,13 +185,20 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
             options
         );
 
-        await this.githubUtil.uploadToRepository(
-            tmpDir,
-            repository,
-            `Rename ${this.targetFilePath} to ${this.newFileName}`,
-            this.ref ?? `heads/${repository.default_branch}`,
-            modifiedDescriptorWithTree
-        );
+        if (!this.dryRun) {
+            await this.githubUtil.uploadToRepository(
+                tmpDir,
+                repository,
+                `Rename ${this.targetFilePath} to ${this.newFileName}`,
+                this.ref ?? `heads/${repository.default_branch}`,
+                modifiedDescriptorWithTree
+            );
+        } else {
+            this.logger.info(
+                `[${RenameFileAction.CLASS_NAME}.run]`,
+                `Dry run mode enabled, changes will not be commited`
+            );
+        }
 
         this.filesystemUtil.removeDirectory(tmpDir);
     }

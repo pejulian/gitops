@@ -1,5 +1,6 @@
 import { WriteFileOptions, realpathSync } from 'fs';
 import { relative, dirname, join } from 'path';
+import os from 'os';
 import fse from 'fs-extra';
 import { LoggerUtil } from './logger.util';
 import { fileURLToPath } from 'url';
@@ -17,15 +18,45 @@ export type FilesystemWriteFileOptions = WriteFileOptions;
 
 export type GlobOptions = GlobbyOptions;
 
+export type ModuleConf = Readonly<{
+    gitTokenFilePath?: string;
+    gitApiBase?: string;
+}>;
+
 export class FilesystemUtil {
     private static readonly CLASS_NAME = 'FilesystemUtil';
 
     public static readonly TMP_DIR = '.tmp';
 
+    public static readonly MODULE_CONF_FILE = `${os.homedir()}/.${
+        process.env.MODULE_NAME
+    }rc.json`;
+
     private readonly logger: LoggerUtil;
 
     constructor(options: FilesystemUtilsOptions) {
         this.logger = options.logger;
+    }
+
+    public readConfiguration(encoding: BufferEncoding = 'utf8'): ModuleConf {
+        try {
+            const json = fse.readJSONSync(FilesystemUtil.MODULE_CONF_FILE, {
+                encoding
+            });
+
+            if (Object.keys(json).length === 0) {
+                throw new Error();
+            }
+
+            return json as ModuleConf;
+        } catch (e) {
+            this.logger.info(
+                `[${FilesystemUtil.CLASS_NAME}.readConfiguration]`,
+                `No usable configuration file found at ${FilesystemUtil.MODULE_CONF_FILE}\n`
+            );
+
+            return {};
+        }
     }
 
     /**

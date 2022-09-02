@@ -78,9 +78,8 @@ export type CurrentCommitSha = Readonly<{
 export class GithubUtil {
     private static readonly CLASS_NAME = 'GithubUtil';
 
-    public static GITHUB_TOKEN_PATH = 'c9-cli-token.txt';
-    public static GITHUB_API_BASE_PATH =
-        'https://github.devops.topdanmark.cloud/api/v3';
+    public static GITHUB_TOKEN_PATH = '.git-token';
+    public static GITHUB_API_BASE_PATH = 'https://api.github.com';
 
     private readonly baseDir: string | undefined;
     private readonly octokit: Octokit;
@@ -91,6 +90,16 @@ export class GithubUtil {
         this.logger = options.logger;
 
         this.filesystemUtil = options.filesystemUtils;
+
+        const moduleConf = this.filesystemUtil.readConfiguration();
+
+        if (moduleConf.gitApiBase) {
+            GithubUtil.GITHUB_API_BASE_PATH = moduleConf.gitApiBase;
+        }
+
+        if (moduleConf.gitTokenFilePath) {
+            GithubUtil.GITHUB_TOKEN_PATH = moduleConf.gitTokenFilePath;
+        }
 
         this.baseDir = options?.baseDir;
 
@@ -1505,8 +1514,8 @@ export class GithubUtil {
 //         filesystemUtils: new FilesystemUtil({ logger })
 //     });
 
-//     const [repository] = await gitUtil.listRepositoriesForOrganization('c9', {
-//         onlyInclude: 'c9-stakeholder-service'
+//     const [repository] = await gitUtil.listRepositoriesForOrganization('foo', {
+//         onlyInclude: 'foo-service'
 //     });
 
 //     console.log(repository);

@@ -10,7 +10,8 @@ import {
     repositoriesOption,
     repositoryListOption,
     excludeRepositoriesOption,
-    scriptKeyOption
+    scriptKeyOption,
+    dryRunOption
 } from './options';
 
 export const createCommand = (program: Command) => {
@@ -32,25 +33,27 @@ Remove a given script from the "scripts" section in "package.json" for effected 
     -r RegExp 
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
+    --dry-run
 ]
 
 Examples:
 
-This command will remove the script with key "c9-deploy" in all repositories that contains a package.json file with a "scripts" section in the GitHub organization named "c9". The operation will use the default log level, INFO. The operation will run on the default branch of each repository scanned.
+This command will remove the script with key "fancy-deploy" in all repositories that contains a package.json file with a "scripts" section in the GitHub organization named "my-org". The operation will use the default log level, INFO. The operation will run on the default branch of each repository scanned.
 
 npx gitops remove-package-json-script
-  -o c9
-  -k "c9-deploy"
+  -o my-org
+  -k "fancy-deploy"
 
-This command will remove the script with key "c9-deploy" ONLY for the repository called "top-context" if it contains a package.json file with a "scripts" section in the GitHub organization named "c9". The operation will use the DEBUG log level. The operation will run on the default branch of each repository scanned.
+This command will remove the script with key "fancy-deploy" ONLY for the repository called "top-context" if it contains a package.json file with a "scripts" section in the GitHub organization named "my-org". The operation will use the DEBUG log level. The operation will run on the default branch of each repository scanned.
 
 npx gitops remove-package-json-script
-  -o c9
-  -k "c9-deploy"
+  -o my-org
+  -k "fancy-deploy"
   -i top-context
   -l DEBUG
 `
         )
+        .addOption(dryRunOption)
         .addOption(tokenFilePathOption)
         .addOption(githubTokenOption)
         .addOption(logLevelOption)

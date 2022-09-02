@@ -12,7 +12,8 @@ import {
     excludeRepositoriesOption,
     packageNameOption,
     packageTypeOption,
-    packageVersionOption
+    packageVersionOption,
+    dryRunOption
 } from './options';
 
 export const createCommand = (program: Command) => {
@@ -35,38 +36,40 @@ Install a new package in the effected repositories for the given organizations.
     -r RegExp 
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
+    --dry-run
 ]
 
 Examples:
 
-This command will install the package "c9-cdk-nodejs" in all repositories for the GitHub organization named "c9" in "devDependencies" with the version "2.2.0". The operation will use the default log level, INFO. The operation will run on the default branch of each repository scanned.
+This command will install the package "aws-cdk" in all repositories for the GitHub organization named "faz" in "devDependencies" with the version "2.40.0". The operation will use the default log level, INFO. The operation will run on the default branch of each repository scanned.
 
 npx gitops install-package
-  -o c9
-  -n "c9-cdk-nodejs"
-  -v "2.2.0"
+  -o faz
+  -n "aws-cdk"
+  -v "2.40.0"
   -y d
 
-This command will install the package "c9-deploy" in the repository "c9-login-refresh" in the GitHub organization named "c9" in "devDependencies" with the latest version. The operation will run with the log level of DEBUG. The operation will run on the "dev" branch of each repository scanned.
+This command will install the package "fancy-deploy" in the repository "fancy-login-user" in the GitHub organization named "my-org" in "devDependencies" with the latest version. The operation will run with the log level of DEBUG. The operation will run on the "dev" branch of each repository scanned.
 
 npx gitops install-package
-  -o c9
+  -o my-org
   -l DEBUG
-  -r "c9-login-refresh"
-  -n "c9-deploy"
+  -r "fancy-login-user"
+  -n "fancy-deploy"
   -f "heads/dev"
   -v "latest"
   -t d
 
-This command will install the package "webpack" in all repositories in the GitHub organization named "c9" in "optionalDependencies" to the latest version. The operation will run using the default level and default branch of the repository scanned.
+This command will install the package "webpack" in all repositories in the GitHub organization named "my-org" in "optionalDependencies" to the latest version. The operation will run using the default level and default branch of the repository scanned.
 
 npx gitops install-package
-  -o c9
+  -o my-org
   -n "webpack"
   -v "latest"
   -t o
 `
         )
+        .addOption(dryRunOption)
         .addOption(tokenFilePathOption)
         .addOption(githubTokenOption)
         .addOption(logLevelOption)

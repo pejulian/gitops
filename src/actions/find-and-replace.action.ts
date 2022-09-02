@@ -269,26 +269,42 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                         options
                     );
 
-                    const uploadResponse =
-                        await this.githubUtil.uploadToRepository(
-                            tmpDir,
-                            repository,
-                            `Find and replace ${this.searchFor} to ${this.replaceWith} in ${matchedDescriptor.path}`,
-                            this.ref ?? `heads/${repository.default_branch}`,
-                            {
-                                descriptors: [matchedDescriptor],
-                                tree: gitTree
-                            },
-                            {
-                                removeSubtrees: false // set this to false because we obtained the tree recursively (meaning that all paths in the repo at represented in a single Git tree object)
-                            }
+                    if (!this.dryRun) {
+                        const uploadResponse =
+                            await this.githubUtil.uploadToRepository(
+                                tmpDir,
+                                repository,
+                                `Find and replace ${this.searchFor} to ${this.replaceWith} in ${matchedDescriptor.path}`,
+                                this.ref ??
+                                    `heads/${repository.default_branch}`,
+                                {
+                                    descriptors: [matchedDescriptor],
+                                    tree: gitTree
+                                },
+                                {
+                                    removeSubtrees: false // set this to false because we obtained the tree recursively (meaning that all paths in the repo at represented in a single Git tree object)
+                                }
+                            );
+
+                        this.actionReporter.addSuccessful({
+                            name: repository.full_name,
+                            reason: `Completed: ${uploadResponse.ref}`,
+                            ref:
+                                this.ref ?? `heads/${repository.default_branch}`
+                        });
+                    } else {
+                        this.logger.info(
+                            `[${FindAndReplaceAction.CLASS_NAME}.run]`,
+                            `Dry run mode enabled, changes will not be commited`
                         );
 
-                    this.actionReporter.addSuccessful({
-                        name: repository.full_name,
-                        reason: `Completed: ${uploadResponse.ref}`,
-                        ref: this.ref ?? `heads/${repository.default_branch}`
-                    });
+                        this.actionReporter.addSuccessful({
+                            name: repository.full_name,
+                            reason: `Completed dry run`,
+                            ref:
+                                this.ref ?? `heads/${repository.default_branch}`
+                        });
+                    }
                 } else {
                     this.logger.info(
                         `[${FindAndReplaceAction.CLASS_NAME}.findAndReplace]`,

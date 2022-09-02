@@ -219,46 +219,60 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                     continue;
                 }
 
-                // Remove any file descriptors that match
-                _.remove(descriptorWithTree.tree.tree, (treeItem) => {
-                    const shaMatch = _.find(
-                        descriptorWithTree.descriptors,
-                        (item) => item.sha === treeItem.sha
-                    );
+                if (!this.dryRun) {
+                    // Remove any file descriptors that match
+                    _.remove(descriptorWithTree.tree.tree, (treeItem) => {
+                        const shaMatch = _.find(
+                            descriptorWithTree.descriptors,
+                            (item) => item.sha === treeItem.sha
+                        );
 
-                    return shaMatch ? true : false;
-                });
-
-                try {
-                    await this.githubUtil.uploadToRepository(
-                        repoPath,
-                        repository,
-                        `Update ${this.packageName} to version ${this.packageVersion}`,
-                        this.ref ?? `heads/${repository.default_branch}`,
-                        descriptorWithTree,
-                        {
-                            removeSubtrees: false, // set to false because we didnt obtain the tree recursively
-                            globOptions: {
-                                deep: 1,
-                                onlyFiles: true
-                            }
-                        }
-                    );
-                } catch (e) {
-                    this.logger.warn(
-                        `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
-                        `Failed to upload changes\n`,
-                        e
-                    );
-
-                    this.actionReporter.addFailed({
-                        name: repository.full_name,
-                        reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.ref ?? `heads/${repository.default_branch}`
+                        return shaMatch ? true : false;
                     });
 
-                    continue;
+                    try {
+                        await this.githubUtil.uploadToRepository(
+                            repoPath,
+                            repository,
+                            `Update ${this.packageName} to version ${this.packageVersion}`,
+                            this.ref ?? `heads/${repository.default_branch}`,
+                            descriptorWithTree,
+                            {
+                                removeSubtrees: false, // set to false because we didnt obtain the tree recursively
+                                globOptions: {
+                                    deep: 1,
+                                    onlyFiles: true
+                                }
+                            }
+                        );
+                    } catch (e) {
+                        this.logger.warn(
+                            `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+                            `Failed to upload changes\n`,
+                            e
+                        );
+
+                        this.actionReporter.addFailed({
+                            name: repository.full_name,
+                            reason: `${LoggerUtil.getErrorMessage(e)}`,
+                            ref:
+                                this.ref ?? `heads/${repository.default_branch}`
+                        });
+
+                        continue;
+                    }
+                } else {
+                    this.logger.info(
+                        `[${UpdatePackageVersionAction.CLASS_NAME}.run]`,
+                        `Dry run mode enabled, changes will not be commited`
+                    );
                 }
+
+                this.actionReporter.addSuccessful({
+                    name: repository.full_name,
+                    reason: `Updated ${this.packageName} to ${this.packageVersion} successfully`,
+                    ref: this.ref ?? `heads/${repository.default_branch}`
+                });
             }
 
             this.filesystemUtil.removeDirectory(tmpDir);
@@ -380,12 +394,39 @@ export class UpdatePackageVersionAction extends GenericAction<UpdatePackageVersi
                 packageJsonDescriptorAndContent.content
             );
 
-            const { versionFound: theExistingVersion } =
-                NpmUtil.doesDependencyExist(
+            let theExistingVersion: ReturnType<
+                typeof NpmUtil.doesDependencyExist
+            >['versionFound'];
+
+            try {
+                const result = NpmUtil.doesDependencyExist(
                     maybePackageJson,
                     this.packageName,
-                    this.packageType
+                    this.packageType,
+                    {
+                        checkAll: true
+                    }
                 );
+
+                theExistingVersion = result.versionFound;
+            } catch (e) {
+                if (e instanceof Error) {
+                    if (
+                        e.message.includes(
+                            `The package ${this.packageName} was not found`
+                        )
+                    ) {
+                        this.logger.info(
+                            `[${UpdatePackageVersionAction.CLASS_NAME}.reinstallPackageForProject]`,
+                            `The package ${this.packageName} was not found in ${repository.name}`
+                        );
+
+                        return undefined;
+                    }
+                }
+
+                throw e;
+            }
 
             if (!theExistingVersion) {
                 this.logger.info(

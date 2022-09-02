@@ -179,47 +179,55 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                     continue;
                 }
 
-                // Remove any file descriptors that match
-                _.remove(descriptorWithTree.tree.tree, (treeItem) => {
-                    const shaMatch = _.find(
-                        descriptorWithTree.descriptors,
-                        (item) => item.sha === treeItem.sha
-                    );
+                if (!this.dryRun) {
+                    // Remove any file descriptors that match
+                    _.remove(descriptorWithTree.tree.tree, (treeItem) => {
+                        const shaMatch = _.find(
+                            descriptorWithTree.descriptors,
+                            (item) => item.sha === treeItem.sha
+                        );
 
-                    return shaMatch ? true : false;
-                });
-
-                try {
-                    await this.githubUtil.uploadToRepository(
-                        repoPath,
-                        repository,
-                        `Uninstall ${this.packageName} from ${
-                            PackageTypes[this.packageType]
-                        }`,
-                        this.ref ?? `heads/${repository.default_branch}`,
-                        descriptorWithTree,
-                        {
-                            removeSubtrees: false, // set to false because we didnt obtain the tree recursively
-                            globOptions: {
-                                deep: 1,
-                                onlyFiles: true
-                            }
-                        }
-                    );
-                } catch (e) {
-                    this.logger.warn(
-                        `[${UninstallPackageAction.CLASS_NAME}.run]`,
-                        `Failed to commit changes\n`,
-                        e
-                    );
-
-                    this.actionReporter.addFailed({
-                        name: repository.full_name,
-                        reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.ref ?? `heads/${repository.default_branch}`
+                        return shaMatch ? true : false;
                     });
 
-                    continue;
+                    try {
+                        await this.githubUtil.uploadToRepository(
+                            repoPath,
+                            repository,
+                            `Uninstall ${this.packageName} from ${
+                                PackageTypes[this.packageType]
+                            }`,
+                            this.ref ?? `heads/${repository.default_branch}`,
+                            descriptorWithTree,
+                            {
+                                removeSubtrees: false, // set to false because we didnt obtain the tree recursively
+                                globOptions: {
+                                    deep: 1,
+                                    onlyFiles: true
+                                }
+                            }
+                        );
+                    } catch (e) {
+                        this.logger.warn(
+                            `[${UninstallPackageAction.CLASS_NAME}.run]`,
+                            `Failed to commit changes\n`,
+                            e
+                        );
+
+                        this.actionReporter.addFailed({
+                            name: repository.full_name,
+                            reason: `${LoggerUtil.getErrorMessage(e)}`,
+                            ref:
+                                this.ref ?? `heads/${repository.default_branch}`
+                        });
+
+                        continue;
+                    }
+                } else {
+                    this.logger.info(
+                        `[${UninstallPackageAction.CLASS_NAME}.run]`,
+                        `Dry run mode enabled, changes will not be commited`
+                    );
                 }
 
                 this.actionReporter.addSuccessful({
@@ -346,17 +354,45 @@ export class UninstallPackageAction extends GenericAction<UninstallPackageAction
                 packageJsonDescriptorAndContent.content
             );
 
-            const {
-                packageType: theExistingPackageType,
-                versionFound: theExistingVersion
-            } = NpmUtil.doesDependencyExist(
-                maybePackageJson,
-                this.packageName,
-                this.packageType,
-                {
-                    checkAll: true
+            let theExistingPackageType: ReturnType<
+                typeof NpmUtil.doesDependencyExist
+            >['packageType'];
+            let theExistingVersion: ReturnType<
+                typeof NpmUtil.doesDependencyExist
+            >['versionFound'];
+
+            try {
+                const result = NpmUtil.doesDependencyExist(
+                    maybePackageJson,
+                    this.packageName,
+                    this.packageType,
+                    {
+                        checkAll: true
+                    }
+                );
+
+                theExistingPackageType = result.packageType;
+                theExistingVersion = result.versionFound;
+            } catch (e) {
+                if (e instanceof Error) {
+                    if (
+                        e.message.includes(
+                            `The package ${this.packageName} was not found`
+                        )
+                    ) {
+                        this.logger.info(
+                            `[${UninstallPackageAction.CLASS_NAME}.uninstallPackageForProject]`,
+                            `The package ${this.packageName} was not found in ${
+                                repository.name
+                            } in ${PackageTypes[this.packageType]}`
+                        );
+
+                        return undefined;
+                    }
                 }
-            );
+
+                throw e;
+            }
 
             if (!theExistingVersion) {
                 this.logger.info(

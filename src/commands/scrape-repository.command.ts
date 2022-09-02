@@ -9,7 +9,8 @@ import {
     organizationsOption,
     repositoriesOption,
     repositoryListOption,
-    excludeRepositoriesOption
+    excludeRepositoriesOption,
+    dryRunOption
 } from './options';
 
 export const createCommand = (program: Command) => {
@@ -29,13 +30,14 @@ Downloads repositories for the given organizations.
     -r RegExp 
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
+    --dry-run
 ]
 
 Examples:
 
-Download all repositories in the Git organization "c9". All other settings will use defaults which are log level will be INFO and the branch used will be the default branch of the repository.
+Download all repositories in the Git organization "my-org". All other settings will use defaults which are log level will be INFO and the branch used will be the default branch of the repository.
 
-npx gitops scrape-repository -o c9
+npx gitops scrape-repository -o my-org
 
 Download just one repository in the "ragnarok" Git organization called "assistant-service-api". Default settings are overriden where the operation will run with a DEBUG log level and the operation will run only on the "development" branch of each repository. The operation also uses a user supplied Git Access Token called "abc123".
 
@@ -47,6 +49,7 @@ npx gitops scrape-repository
     -r assistant-service-api
         `
         )
+        .addOption(dryRunOption)
         .addOption(tokenFilePathOption)
         .addOption(githubTokenOption)
         .addOption(logLevelOption)

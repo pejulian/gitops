@@ -85,6 +85,13 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
         this.organizations = options.organizations;
         this.ref = options.ref;
         this.dryRun = options.dryRun;
+
+        if (this.dryRun) {
+            this.logger.info(
+                `[${GenericAction.CLASS_NAME}.constructor]`,
+                `Dry run mode`
+            );
+        }
     }
 
     public async run(): Promise<T> {

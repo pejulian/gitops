@@ -12,7 +12,8 @@ import {
     excludeRepositoriesOption,
     scriptKeyOption,
     scriptValueOption,
-    overrideExistingScriptKeyOption
+    overrideExistingScriptKeyOption,
+    dryRunOption
 } from './options';
 
 export const createCommand = (program: Command) => {
@@ -36,14 +37,15 @@ Adds a script to the "scripts" section in "package.json" for effected repositori
     -r RegExp 
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
+    --dry-run
 ]
 
 Examples:
 
-This command will add the script with key "test" and value "jest" in all repositories that contains a package.json file with a "scripts" section in the GitHub organization named "c9". The operation will use the default log level, INFO. The operation will run on the default branch of each repository scanned.
+This command will add the script with key "test" and value "jest" in all repositories that contains a package.json file with a "scripts" section in the GitHub organization named "foo". The operation will use the default log level, INFO. The operation will run on the default branch of each repository scanned.
 
 npx gitops add-package-json-script
-  -o c9
+  -o foo
   -k "test"
   -a "npm run test"
 
@@ -57,6 +59,7 @@ npx gitops add-package-json-script
   -l DEBUG
 `
         )
+        .addOption(dryRunOption)
         .addOption(tokenFilePathOption)
         .addOption(githubTokenOption)
         .addOption(logLevelOption)

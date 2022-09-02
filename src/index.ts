@@ -109,8 +109,23 @@ const program = new Command();
 program
     .name(MODULE_NAME)
     .summary(process.env.MODULE_DESCRIPTION ?? MODULE_NAME)
+    .description(
+        `
+        This module makes it easier for one to run common operations on Git repositories at scale.
+        The target use case of this module is to simplify maintenance tasks by reducing the need for carrying out repetitive steps on multiple repositories.
+        This tool also offers relevant methods to help users scope out the list of repositories that will be affected by batch operations.
+
+        NOTE:
+        This module uses the capabilities YOUR LOCAL MACHINE to make changes to repositories.
+        Therefore, it is required that you have the necessary tools installed on your machine before running any of the commands offered by this module.
+
+        A working node and npm setup is required so that "npm ci" and "npm run build" can be executed on each project that will be affected by changes.
+    `
+    )
     .version(MODULE_VERSION)
-    .showHelpAfterError(true);
+    .showHelpAfterError(true)
+    .allowExcessArguments(false)
+    .allowUnknownOption(false);
 
 createCommands(program);
 

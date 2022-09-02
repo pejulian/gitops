@@ -174,45 +174,53 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                     continue;
                 }
 
-                // Remove any file descriptors that match
-                _.remove(descriptorWithTree.tree.tree, (treeItem) => {
-                    const shaMatch = _.find(
-                        descriptorWithTree.descriptors,
-                        (item) => item.sha === treeItem.sha
-                    );
+                if (!this.dryRun) {
+                    // Remove any file descriptors that match
+                    _.remove(descriptorWithTree.tree.tree, (treeItem) => {
+                        const shaMatch = _.find(
+                            descriptorWithTree.descriptors,
+                            (item) => item.sha === treeItem.sha
+                        );
 
-                    return shaMatch ? true : false;
-                });
-
-                try {
-                    await this.githubUtil.uploadToRepository(
-                        repoPath,
-                        repository,
-                        `Removed "${this.scriptKey}" from "scripts" in ${NpmUtil.PACKAGE_JSON_FILE_NAME}`,
-                        this.ref ?? `heads/${repository.default_branch}`,
-                        descriptorWithTree,
-                        {
-                            removeSubtrees: false, // set to false because we didnt obtain the tree recursively
-                            globOptions: {
-                                deep: 1,
-                                onlyFiles: true
-                            }
-                        }
-                    );
-                } catch (e) {
-                    this.logger.warn(
-                        `[${RemovePackageJsonScriptAction.CLASS_NAME}.run]`,
-                        `Failed to commit changes\n`,
-                        e
-                    );
-
-                    this.actionReporter.addFailed({
-                        name: repository.full_name,
-                        reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.ref ?? `heads/${repository.default_branch}`
+                        return shaMatch ? true : false;
                     });
 
-                    continue;
+                    try {
+                        await this.githubUtil.uploadToRepository(
+                            repoPath,
+                            repository,
+                            `Removed "${this.scriptKey}" from "scripts" in ${NpmUtil.PACKAGE_JSON_FILE_NAME}`,
+                            this.ref ?? `heads/${repository.default_branch}`,
+                            descriptorWithTree,
+                            {
+                                removeSubtrees: false, // set to false because we didnt obtain the tree recursively
+                                globOptions: {
+                                    deep: 1,
+                                    onlyFiles: true
+                                }
+                            }
+                        );
+                    } catch (e) {
+                        this.logger.warn(
+                            `[${RemovePackageJsonScriptAction.CLASS_NAME}.run]`,
+                            `Failed to commit changes\n`,
+                            e
+                        );
+
+                        this.actionReporter.addFailed({
+                            name: repository.full_name,
+                            reason: `${LoggerUtil.getErrorMessage(e)}`,
+                            ref:
+                                this.ref ?? `heads/${repository.default_branch}`
+                        });
+
+                        continue;
+                    }
+                } else {
+                    this.logger.info(
+                        `[${RemovePackageJsonScriptAction.CLASS_NAME}.run]`,
+                        `Dry run mode enabled, changes will not be commited`
+                    );
                 }
 
                 this.actionReporter.addSuccessful({

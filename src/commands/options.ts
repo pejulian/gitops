@@ -10,7 +10,7 @@ export const dryRunOption = new Option(
 
 export const tokenFilePathOption = new Option(
     '-p, --token-file-path <value>',
-    "[OPTIONAL] A path to the file in your user's home directory where the GitHub Personal Access Token is stored. Defaults to $HOME/c9-cli-token.txt"
+    "[OPTIONAL] A path to the file in your user's home directory where the GitHub Personal Access Token is stored. Defaults to $HOME/.git-token if not specified and no key called 'gitTokenFilePath' was specified in '.gitopsrc.json'"
 );
 
 export const githubTokenOption = new Option(

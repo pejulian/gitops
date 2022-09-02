@@ -215,47 +215,55 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                     continue;
                 }
 
-                // Remove any file descriptors that match
-                _.remove(descriptorWithTree.tree.tree, (treeItem) => {
-                    const shaMatch = _.find(
-                        descriptorWithTree.descriptors,
-                        (item) => item.sha === treeItem.sha
-                    );
+                if (!this.dryRun) {
+                    // Remove any file descriptors that match
+                    _.remove(descriptorWithTree.tree.tree, (treeItem) => {
+                        const shaMatch = _.find(
+                            descriptorWithTree.descriptors,
+                            (item) => item.sha === treeItem.sha
+                        );
 
-                    return shaMatch ? true : false;
-                });
-
-                try {
-                    await this.githubUtil.uploadToRepository(
-                        repoPath,
-                        repository,
-                        `Install ${this.packageName} with version ${
-                            this.packageVersion
-                        } in ${PackageTypes[this.packageType]}`,
-                        this.ref ?? `heads/${repository.default_branch}`,
-                        descriptorWithTree,
-                        {
-                            removeSubtrees: false, // set to false because we didnt obtain the tree recursively
-                            globOptions: {
-                                deep: 1,
-                                onlyFiles: true
-                            }
-                        }
-                    );
-                } catch (e) {
-                    this.logger.warn(
-                        `[${InstallPackageAction.CLASS_NAME}.run]`,
-                        `Failed to commit changes\n`,
-                        e
-                    );
-
-                    this.actionReporter.addFailed({
-                        name: repository.full_name,
-                        reason: `${LoggerUtil.getErrorMessage(e)}`,
-                        ref: this.ref ?? `heads/${repository.default_branch}`
+                        return shaMatch ? true : false;
                     });
 
-                    continue;
+                    try {
+                        await this.githubUtil.uploadToRepository(
+                            repoPath,
+                            repository,
+                            `Install ${this.packageName} with version ${
+                                this.packageVersion
+                            } in ${PackageTypes[this.packageType]}`,
+                            this.ref ?? `heads/${repository.default_branch}`,
+                            descriptorWithTree,
+                            {
+                                removeSubtrees: false, // set to false because we didnt obtain the tree recursively
+                                globOptions: {
+                                    deep: 1,
+                                    onlyFiles: true
+                                }
+                            }
+                        );
+                    } catch (e) {
+                        this.logger.warn(
+                            `[${InstallPackageAction.CLASS_NAME}.run]`,
+                            `Failed to commit changes\n`,
+                            e
+                        );
+
+                        this.actionReporter.addFailed({
+                            name: repository.full_name,
+                            reason: `${LoggerUtil.getErrorMessage(e)}`,
+                            ref:
+                                this.ref ?? `heads/${repository.default_branch}`
+                        });
+
+                        continue;
+                    }
+                } else {
+                    this.logger.info(
+                        `[${InstallPackageAction.CLASS_NAME}.run]`,
+                        `Dry run mode enabled, changes will not be commited`
+                    );
                 }
 
                 this.actionReporter.addSuccessful({
