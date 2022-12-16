@@ -1,7 +1,7 @@
-import { LoggerUtil } from './logger.util';
 import lodash from 'lodash';
-import { ProcessorUtil } from './processsor.util';
-import { SemverUtil } from './semver.util';
+import { LoggerUtil } from '@utils/logger.util';
+import { ProcessorUtil } from '@utils/processsor.util';
+import { SemverUtil } from '@utils/semver.util';
 
 const { isObject, isArray, isEmpty, isString } = lodash;
 

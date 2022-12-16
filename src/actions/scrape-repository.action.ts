@@ -1,21 +1,18 @@
-import _ from 'lodash';
-import { GitOpsCommands } from '../index';
-import {
-    FilesystemUtil,
-    FilesystemWriteFileOptions
-} from '../utils/filesystem.util';
-import {
-    GitTreeWithFileDescriptor,
-    GitHubRepository
-} from '../utils/github.util';
-import { LogLevel } from '../utils/logger.util';
-import { GenericAction } from './generic.action';
+import { GitOpsCommands } from '@root';
+import {} from '@utils/filesystem.util';
+import { GitHubRepository } from '@utils/github.util';
+import { LogLevel } from '@utils/logger.util';
+import { GenericAction } from '@actions/generic.action';
 
 export type ScrapeRepositoryActionOptions = GitOpsCommands['ScrapeRepository'];
 
 export type ScrapeRepositoryActionResponse = void;
 
 export class ScrapeRepositoryAction extends GenericAction<ScrapeRepositoryActionResponse> {
+    private readonly overwriteExisting: ScrapeRepositoryActionOptions['overwriteExisting'];
+    private readonly skipExisting: ScrapeRepositoryActionOptions['skipExisting'];
+    private readonly extractDownload: ScrapeRepositoryActionOptions['extractDownload'];
+
     constructor(options: ScrapeRepositoryActionOptions) {
         ScrapeRepositoryAction.CLASS_NAME = 'ScrapeRepositoryAction';
 
@@ -31,6 +28,10 @@ export class ScrapeRepositoryAction extends GenericAction<ScrapeRepositoryAction
             command: ScrapeRepositoryAction.CLASS_NAME,
             dryRun: options.dryRun
         });
+
+        this.overwriteExisting = options.overwriteExisting;
+        this.skipExisting = options.skipExisting;
+        this.extractDownload = options.extractDownload;
     }
 
     public async run(): Promise<ScrapeRepositoryActionResponse> {
@@ -48,9 +49,25 @@ export class ScrapeRepositoryAction extends GenericAction<ScrapeRepositoryAction
                 .join('')}`
         );
 
+        let rootFolder: string | undefined;
+        if (!this.dryRun) {
+            rootFolder = this.filesystemUtil.createFolder(
+                `${this.filesystemUtil.getHomeDirectory()}/${
+                    process.env.MODULE_NAME ?? 'gitops'
+                }`
+            );
+        }
+
         for await (const organization of this.organizations) {
             const repositories =
                 await this.listApplicableRepositoriesForOperation(organization);
+
+            let organizationRootFolder: string | undefined;
+            if (!this.dryRun) {
+                organizationRootFolder = this.filesystemUtil.createFolder(
+                    `${rootFolder}/${organization}`
+                );
+            }
 
             for await (const repository of repositories) {
                 // When every loop starts, ensure that all previous terms are cleared
@@ -60,7 +77,10 @@ export class ScrapeRepositoryAction extends GenericAction<ScrapeRepositoryAction
                 this.logger.appendTermToLogPrefix(repository.full_name);
 
                 try {
-                    await this.scrapeRepository(repository);
+                    await this.scrapeRepository(
+                        repository,
+                        organizationRootFolder
+                    );
                 } catch (e) {
                     this.logger.error(
                         `[${ScrapeRepositoryAction.CLASS_NAME}.run]`,
@@ -81,8 +101,25 @@ export class ScrapeRepositoryAction extends GenericAction<ScrapeRepositoryAction
     }
 
     private async scrapeRepository(
-        repository: GitHubRepository
+        repository: GitHubRepository,
+        rootFolderPath?: string
     ): Promise<void> {
-        console.log('TODO', repository);
+        let repositoryRootFolder: string | undefined;
+        if (!this.dryRun) {
+            repositoryRootFolder = this.filesystemUtil.createFolder(
+                `${rootFolderPath}/${repository.name}`
+            );
+        }
+
+        await this.githubUtil.downloadRepository(
+            repository,
+            repositoryRootFolder,
+            this.ref,
+            {
+                overwriteExisting: this.overwriteExisting,
+                skipExisting: this.skipExisting,
+                extractDownload: this.extractDownload
+            }
+        );
     }
 }

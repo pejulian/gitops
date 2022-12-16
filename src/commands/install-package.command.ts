@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import { InstallPackageAction } from '../actions/install-package.action';
-import { GitOpsCommands } from '../index';
+import { InstallPackageAction } from '@actions/install-package.action';
+import { GitOpsCommands } from '@root';
 import {
     tokenFilePathOption,
     githubTokenOption,
@@ -14,7 +14,7 @@ import {
     packageTypeOption,
     packageVersionOption,
     dryRunOption
-} from './options';
+} from '@commands/options';
 
 export const createCommand = (program: Command) => {
     program
@@ -82,7 +82,11 @@ npx gitops install-package
         .addOption(packageVersionOption)
         .addOption(packageTypeOption)
         .action(async (options: GitOpsCommands['InstallPackage']) => {
-            const action = new InstallPackageAction(options);
-            await action.run();
+            try {
+                const action = new InstallPackageAction(options);
+                await action.run();
+            } catch (e) {
+                program.help({ error: true });
+            }
         });
 };

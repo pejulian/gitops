@@ -82,7 +82,12 @@ export type GitOpsCommands = {
         packageType: 'd' | 's' | 'o';
     }> &
         GitOpsCommands['Common'];
-    ScrapeRepository: GitOpsCommands['Common'];
+    ScrapeRepository: Readonly<{
+        skipExisting?: boolean;
+        overwriteExisting?: boolean;
+        extractDownload?: boolean;
+    }> &
+        GitOpsCommands['Common'];
     FindAndReplace: Readonly<{
         searchFor: string;
         searchForFlags: string;
@@ -102,7 +107,7 @@ export type GitOpsCommands = {
         GitOpsCommands['Common'];
 };
 
-console.log(`\n${MODULE_NAME} v${MODULE_VERSION}\n`);
+console.log(`\n${MODULE_NAME} ${MODULE_VERSION}\n`);
 
 const program = new Command();
 

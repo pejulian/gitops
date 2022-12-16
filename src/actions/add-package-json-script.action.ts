@@ -1,13 +1,14 @@
-import { GitOpsCommands } from '../index';
+import _ from 'lodash';
+
+import { GitOpsCommands } from '@root';
 import {
     GitHubRepository,
     GitTreeItem,
     GitTreeWithFileDescriptor
-} from '../utils/github.util';
-import { LoggerUtil, LogLevel } from '../utils/logger.util';
-import { NpmUtil } from '../utils/npm.util';
-import { GenericAction } from './generic.action';
-import _ from 'lodash';
+} from '@utils/github.util';
+import { LoggerUtil, LogLevel } from '@utils/logger.util';
+import { NpmUtil } from '@utils/npm.util';
+import { GenericAction } from '@actions/generic.action';
 
 export type AddPackageJsonScriptActionOptions =
     GitOpsCommands['AddPackageJsonScript'];

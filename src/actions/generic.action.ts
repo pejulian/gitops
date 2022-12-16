@@ -1,11 +1,13 @@
-import { FilesystemUtil } from '../utils/filesystem.util';
-import { GitHubRepository, GithubUtil } from '../utils/github.util';
-import { LoggerUtil, LogLevel } from '../utils/logger.util';
-import { NpmUtil } from '../utils/npm.util';
-import { ProcessorUtil } from '../utils/processsor.util';
-import { SemverUtil } from '../utils/semver.util';
-import { ActionReporter } from '../reporters/action.reporter';
-import { GitOpsCommands } from '..';
+import { GitOpsCommands } from '@root';
+import { FilesystemUtil } from '@utils/filesystem.util';
+import { GitHubRepository, GithubUtil } from '@utils/github.util';
+import { LoggerUtil, LogLevel } from '@utils/logger.util';
+import { NpmUtil } from '@utils/npm.util';
+import { ProcessorUtil } from '@utils/processsor.util';
+import { SemverUtil } from '@utils/semver.util';
+import { ConfigUtil } from '@utils/config.util';
+import { TarUtil } from '@utils/tar.util';
+import { ActionReporter } from '@reporters/action.reporter';
 
 export interface IGenericAction<T> {
     run(): Promise<T>;
@@ -32,6 +34,8 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
     protected readonly processorUtil: ProcessorUtil;
     protected readonly semverUtil: SemverUtil;
     protected readonly npmUtil: NpmUtil;
+    protected readonly configUtil: ConfigUtil;
+    protected readonly tarUtil: TarUtil;
 
     protected readonly actionReporter: ActionReporter;
 
@@ -72,11 +76,21 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
             logger: this.logger
         });
 
+        this.configUtil = new ConfigUtil({
+            logger: this.logger
+        });
+
+        this.tarUtil = new TarUtil({
+            logger: this.logger
+        });
+
         this.githubUtil = new GithubUtil({
+            logger: this.logger,
             githubToken: options.githubToken,
             tokenFilePath: options.tokenFilePath,
-            logger: this.logger,
-            filesystemUtils: this.filesystemUtil
+            filesystemUtil: this.filesystemUtil,
+            configUtil: this.configUtil,
+            tarUtil: this.tarUtil
         });
 
         this.excludeRepositories = options.excludeRepositories;

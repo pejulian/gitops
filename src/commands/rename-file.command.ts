@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import { GitOpsCommands } from '../index';
-import { RenameFileAction } from '../actions/rename-file.action';
+import { GitOpsCommands } from '@root';
+import { RenameFileAction } from '@actions/rename-file.action';
 import {
     tokenFilePathOption,
     githubTokenOption,
@@ -13,7 +13,7 @@ import {
     targetFilePathOption,
     newFileNameOption,
     dryRunOption
-} from './options';
+} from '@commands/options';
 
 export const createCommand = (program: Command) => {
     program
@@ -72,7 +72,11 @@ npx gitops rename-file
         .addOption(targetFilePathOption)
         .addOption(newFileNameOption)
         .action(async (options: GitOpsCommands['RenameFile']) => {
-            const action = new RenameFileAction(options);
-            await action.run();
+            try {
+                const action = new RenameFileAction(options);
+                await action.run();
+            } catch (e) {
+                program.help({ error: true });
+            }
         });
 };

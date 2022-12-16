@@ -1,13 +1,13 @@
 import _ from 'lodash';
-import { GitOpsCommands } from '../index';
+import { GitOpsCommands } from '@root';
 import {
     GitTreeWithFileDescriptor,
     GitHubRepository,
     GitTreeItem
-} from '../utils/github.util';
-import { LoggerUtil, LogLevel } from '../utils/logger.util';
-import { InstallModes, NpmUtil, PackageTypes } from '../utils/npm.util';
-import { GenericAction } from './generic.action';
+} from '@utils/github.util';
+import { LoggerUtil, LogLevel } from '@utils/logger.util';
+import { InstallModes, NpmUtil, PackageTypes } from '@utils/npm.util';
+import { GenericAction } from '@actions/generic.action';
 
 export type UpdatePackageVersionActionOptions =
     GitOpsCommands['UpdatePackageVersion'];

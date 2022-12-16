@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import { RemovePackageJsonScriptAction } from '../actions/remove-package-json-scipt.action';
-import { GitOpsCommands } from '../index';
+import { RemovePackageJsonScriptAction } from '@actions/remove-package-json-scipt.action';
+import { GitOpsCommands } from '@root';
 import {
     tokenFilePathOption,
     githubTokenOption,
@@ -12,7 +12,7 @@ import {
     excludeRepositoriesOption,
     scriptKeyOption,
     dryRunOption
-} from './options';
+} from '@commands/options';
 
 export const createCommand = (program: Command) => {
     program
@@ -64,7 +64,11 @@ npx gitops remove-package-json-script
         .addOption(excludeRepositoriesOption)
         .addOption(scriptKeyOption)
         .action(async (options: GitOpsCommands['RemovePackageJsonScript']) => {
-            const action = new RemovePackageJsonScriptAction(options);
-            await action.run();
+            try {
+                const action = new RemovePackageJsonScriptAction(options);
+                await action.run();
+            } catch (e) {
+                program.help({ error: true });
+            }
         });
 };

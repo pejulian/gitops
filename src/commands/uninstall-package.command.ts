@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { GitOpsCommands } from '../index';
+import { GitOpsCommands } from '@root';
 import {
     tokenFilePathOption,
     githubTokenOption,
@@ -14,8 +14,8 @@ import {
     packageUpdateConditionOption,
     packageUpdateConstraintOption,
     dryRunOption
-} from './options';
-import { UninstallPackageAction } from '../actions/uninstall-package.action';
+} from '@commands/options';
+import { UninstallPackageAction } from '@actions/uninstall-package.action';
 
 export const createCommand = (program: Command) => {
     program
@@ -87,7 +87,11 @@ npx gitops uninstall-package
         .addOption(packageUpdateConditionOption)
         .addOption(packageUpdateConstraintOption)
         .action(async (options: GitOpsCommands['UninstallPackage']) => {
-            const action = new UninstallPackageAction(options);
-            await action.run();
+            try {
+                const action = new UninstallPackageAction(options);
+                await action.run();
+            } catch (e) {
+                program.help({ error: true });
+            }
         });
 };

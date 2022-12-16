@@ -1,14 +1,15 @@
 import os from 'os';
 import _ from 'lodash';
+import { Agent } from 'https';
 
 import { Octokit, RestEndpointMethodTypes } from '@octokit/rest';
 import { operations, components } from '@octokit/openapi-types';
 
-import { Agent } from 'https';
-
-import { MODULE_NAME, MODULE_VERSION } from '../index';
-import { FilesystemUtil, GlobOptions } from './filesystem.util';
-import { LoggerUtil } from './logger.util';
+import { MODULE_NAME, MODULE_VERSION } from '@root';
+import { FilesystemUtil, GlobOptions } from '@utils/filesystem.util';
+import { LoggerUtil } from '@utils/logger.util';
+import { ConfigUtil } from '@utils/config.util';
+import { TarUtil } from '@utils/tar.util';
 
 export type GitHubRepository = components['schemas']['minimal-repository'];
 
@@ -67,7 +68,9 @@ export type GithubUtilsOptions = Readonly<{
     tokenFilePath?: string;
     baseDir?: string;
     logger: LoggerUtil;
-    filesystemUtils: FilesystemUtil;
+    filesystemUtil: FilesystemUtil;
+    configUtil: ConfigUtil;
+    tarUtil: TarUtil;
 }>;
 
 export type CurrentCommitSha = Readonly<{
@@ -85,13 +88,17 @@ export class GithubUtil {
     private readonly octokit: Octokit;
     private readonly logger: LoggerUtil;
     private readonly filesystemUtil: FilesystemUtil;
+    private readonly configUtil: ConfigUtil;
+    private readonly tarUtil: TarUtil;
 
     constructor(options: GithubUtilsOptions) {
         this.logger = options.logger;
 
-        this.filesystemUtil = options.filesystemUtils;
+        this.filesystemUtil = options.filesystemUtil;
+        this.configUtil = options.configUtil;
+        this.tarUtil = options.tarUtil;
 
-        const moduleConf = this.filesystemUtil.readConfiguration();
+        const moduleConf = this.configUtil.readConfiguration();
 
         if (moduleConf.gitApiBase) {
             GithubUtil.GITHUB_API_BASE_PATH = moduleConf.gitApiBase;
@@ -146,7 +153,7 @@ export class GithubUtil {
             auth: pat,
             baseUrl: GithubUtil.GITHUB_API_BASE_PATH,
             request: { agent: new Agent({ rejectUnauthorized: false }) },
-            userAgent: `${MODULE_NAME} v${MODULE_VERSION}`
+            userAgent: `${MODULE_NAME} ${MODULE_VERSION}`
         });
     }
 
@@ -164,6 +171,10 @@ export class GithubUtil {
                 includeForks: boolean;
                 includeArchived: boolean;
                 includeDisabled: boolean;
+                /**
+                 * Only return the given repository name.
+                 * Will be ignored if `onlyFromList` is specified.
+                 */
                 onlyInclude: string;
                 excludeRepositories: Array<string>;
                 onlyFromList: Array<string>;
@@ -337,7 +348,7 @@ export class GithubUtil {
                     ] as GitTreeItemWithGitTree;
                 }
 
-                return treeItem as GitTreeItem;
+                return treeItem;
             })
         );
 
@@ -440,7 +451,7 @@ export class GithubUtil {
                     ...(options && options)
                 }
             )) {
-                response.data.map((release) => {
+                response.data.forEach((release) => {
                     tags.push(release.tag_name);
                 });
             }
@@ -855,8 +866,8 @@ export class GithubUtil {
 
         const commitBranchResponse = await this.setCommmitBranch(
             repository,
-            ref,
-            newCommit.sha
+            newCommit.sha,
+            ref
         );
 
         this.logger.debug(
@@ -1219,8 +1230,8 @@ export class GithubUtil {
 
     public async setCommmitBranch(
         repository: GitHubRepository,
-        ref = `heads/master`,
-        commitSha: string
+        commitSha: string,
+        ref = `heads/master`
     ): Promise<GitReference> {
         try {
             const response = await this.octokit.git.updateRef({
@@ -1283,6 +1294,105 @@ export class GithubUtil {
             .value();
 
         return match;
+    }
+
+    /**
+     *
+     * @param repository The repository to download
+     * @param ref The git reference to use for downloading the repository
+     * @param downloadPath The full path to where the file will be saved
+     * @param options Instructions on what to do when the file path for the repo already exists in the local system. Options are to either skip existing (default behavior) or overwrite existing.
+     */
+    public async downloadRepository(
+        repository: GitHubRepository,
+        downloadPath?: string,
+        ref = `heads/${repository.default_branch}`,
+        options: Readonly<{
+            /**
+             * Skip saving the repository to the path if it already exists
+             */
+            skipExisting?: boolean;
+            /**
+             * Overwrite the existing repository at the given path
+             */
+            overwriteExisting?: boolean;
+            /**
+             * Extract the package after downloaded
+             */
+            extractDownload?: boolean;
+        }> = {
+            overwriteExisting: false,
+            skipExisting: true,
+            extractDownload: false
+        }
+    ): Promise<void> {
+        try {
+            const response = await this.octokit.repos.downloadTarballArchive({
+                owner: repository.owner.login,
+                ref,
+                repo: repository.name
+            });
+
+            // cast the status code to number before checking it because the final response has followed the original redirect response
+            // and should be reflecting the redirect response.
+            if ((response.status as unknown as number) !== 200) {
+                throw new Error(
+                    `[${response.status}] ${response.url} [${response.data}]`
+                );
+            }
+
+            const buffer = response.data as ArrayBuffer;
+
+            if (downloadPath) {
+                if (options.overwriteExisting ?? false) {
+                    if (this.filesystemUtil.doesFolderExist(downloadPath)) {
+                        this.logger.info(
+                            `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
+                            `Replacing contents of ${repository.full_name} at existing path ${downloadPath}`
+                        );
+
+                        this.filesystemUtil.removeDirectory(downloadPath, {
+                            recursive: true,
+                            force: true
+                        });
+
+                        this.filesystemUtil.createFolder(downloadPath);
+                    }
+                } else if (options.skipExisting ?? true) {
+                    if (this.filesystemUtil.doesFolderExist(downloadPath)) {
+                        this.logger.info(
+                            `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
+                            `Skip downloading ${repository.full_name} as it already exists at path ${downloadPath}`
+                        );
+
+                        return;
+                    }
+                }
+
+                this.filesystemUtil.writeFileFromBuffer(
+                    `${downloadPath}/${repository.name}.tar`,
+                    Buffer.from(buffer)
+                );
+
+                this.logger.info(
+                    `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
+                    `Downloaded ${repository.full_name} to ${downloadPath}`
+                );
+            } else {
+                this.logger.info(
+                    `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
+                    `Skip saving download to local file system`
+                );
+            }
+        } catch (e) {
+            this.logger.error(
+                `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
+                `Cannot download ${repository.name}\n`,
+                e
+            );
+
+            throw e;
+        }
     }
 
     /**
@@ -1495,12 +1605,28 @@ export class GithubUtil {
 }
 
 /**
-  node \
-  --no-warnings \
-  --experimental-specifier-resolution=node \
-  --experimental-modules \
-  --loader ts-node/esm src/utils/github.util.ts
+  node --no-warnings --experimental-specifier-resolution=node --experimental-modules --loader ts-node/esm src/utils/github.util.ts
  */
+
+// (async () => {
+//     const { LoggerUtil, LogLevel } = await import('./logger.util');
+//     const { FilesystemUtil } = await import('./filesystem.util');
+//     const { ConfigUtil } = await import('./config.util');
+
+//     const logger = new LoggerUtil(LogLevel.DEBUG, 'test');
+
+//     const gitUtil = new GithubUtil({
+//         logger,
+//         filesystemUtil: new FilesystemUtil({ logger }),
+//         configUtil: new ConfigUtil({ logger })
+//     });
+
+//     const [repository] = await gitUtil.listRepositoriesForOrganization('c9', {
+//         onlyInclude: 'c9-upload-api'
+//     });
+
+//     await gitUtil.downloadRepository(repository);
+// })();
 
 // (async () => {
 //     const { LoggerUtil, LogLevel } = await import('./logger.util');
@@ -1511,7 +1637,7 @@ export class GithubUtil {
 
 //     const gitUtil = new GithubUtil({
 //         logger,
-//         filesystemUtils: new FilesystemUtil({ logger })
+//         filesystemUtil: new FilesystemUtil({ logger })
 //     });
 
 //     const [repository] = await gitUtil.listRepositoriesForOrganization('foo', {

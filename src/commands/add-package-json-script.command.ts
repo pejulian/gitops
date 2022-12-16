@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import { AddPackageJsonScriptAction } from '../actions/add-package-json-script.action';
-import { GitOpsCommands } from '../index';
+import { AddPackageJsonScriptAction } from '@actions/add-package-json-script.action';
+import { GitOpsCommands } from '@root';
 import {
     tokenFilePathOption,
     githubTokenOption,
@@ -14,7 +14,7 @@ import {
     scriptValueOption,
     overrideExistingScriptKeyOption,
     dryRunOption
-} from './options';
+} from '@commands/options';
 
 export const createCommand = (program: Command) => {
     program
@@ -72,7 +72,13 @@ npx gitops add-package-json-script
         .addOption(scriptValueOption)
         .addOption(overrideExistingScriptKeyOption)
         .action(async (options: GitOpsCommands['AddPackageJsonScript']) => {
-            const action = new AddPackageJsonScriptAction(options);
-            await action.run();
+            try {
+                const action = new AddPackageJsonScriptAction(options);
+                await action.run();
+            } catch (e) {
+                program.help({
+                    error: true
+                });
+            }
         });
 };

@@ -1,4 +1,4 @@
-import { LoggerUtil } from '../utils/logger.util';
+import { LoggerUtil } from '@utils/logger.util';
 
 export type RepositoryOutcome = Readonly<{
     name: string;

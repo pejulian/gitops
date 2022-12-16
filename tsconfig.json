@@ -9,6 +9,7 @@
         "resolveJsonModule": true,
         "moduleResolution": "node",
         "rootDir": "./",
+        "baseUrl": "./",
         "declaration": false,
         "declarationMap": false,
         "sourceMap": false,
@@ -22,7 +23,14 @@
         "alwaysStrict": true,
         "typeRoots": ["./node_modules/@types", "./types"],
         "esModuleInterop": true,
-        "newLine": "lf"
+        "newLine": "lf",
+        "paths": {
+            "@root": ["src/index.ts"],
+            "@utils/*": ["src/utils/*"],
+            "@actions/*": ["src/actions/*"],
+            "@commands/*": ["src/commands/*"],
+            "@reporters/*": ["src/reporters/*"]
+        }
     },
     "exclude": ["node_modules", "dist", "lib", ".husky", "coverage", "target"]
 }

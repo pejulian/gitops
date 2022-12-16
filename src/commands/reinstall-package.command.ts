@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import { ReinstallPackageAction } from '../actions/reinstall-package.action';
-import { GitOpsCommands } from '../index';
+import { ReinstallPackageAction } from '@actions/reinstall-package.action';
+import { GitOpsCommands } from '@root';
 import {
     tokenFilePathOption,
     githubTokenOption,
@@ -16,7 +16,7 @@ import {
     packageUpdateConstraintOption,
     packageVersionOption,
     dryRunOption
-} from './options';
+} from '@commands/options';
 
 export const createCommand = (program: Command) => {
     program
@@ -92,7 +92,11 @@ npx gitops reinstall-package
         .addOption(packageUpdateConditionOption)
         .addOption(packageUpdateConstraintOption)
         .action(async (options: GitOpsCommands['ReinstallPackage']) => {
-            const action = new ReinstallPackageAction(options);
-            await action.run();
+            try {
+                const action = new ReinstallPackageAction(options);
+                await action.run();
+            } catch (e) {
+                program.help({ error: true });
+            }
         });
 };

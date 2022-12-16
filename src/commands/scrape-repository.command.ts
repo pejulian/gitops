@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import { GitOpsCommands } from '../index';
-import { ScrapeRepositoryAction } from '../actions/scrape-repository.action';
+import { GitOpsCommands } from '@root';
+import { ScrapeRepositoryAction } from '@actions/scrape-repository.action';
 import {
     tokenFilePathOption,
     githubTokenOption,
@@ -10,8 +10,11 @@ import {
     repositoriesOption,
     repositoryListOption,
     excludeRepositoriesOption,
-    dryRunOption
-} from './options';
+    dryRunOption,
+    skipExistingOption,
+    overwriteExistingOption,
+    extractDownloadOption
+} from '@commands/options';
 
 export const createCommand = (program: Command) => {
     program
@@ -19,7 +22,7 @@ export const createCommand = (program: Command) => {
         .summary('Downloads repositories for the given organizations.')
         .usage(
             `
-Downloads repositories for the given organizations.
+Downloads repositories (as tarball) for the given organizations.
 
 -o ORGANIZATIONS,..., n  
 [
@@ -31,6 +34,9 @@ Downloads repositories for the given organizations.
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
     --dry-run
+    --overwrite-existing
+    --skip-existing
+    --extract-download
 ]
 
 Examples:
@@ -39,17 +45,43 @@ Download all repositories in the Git organization "my-org". All other settings w
 
 npx gitops scrape-repository -o my-org
 
-Download just one repository in the "ragnarok" Git organization called "assistant-service-api". Default settings are overriden where the operation will run with a DEBUG log level and the operation will run only on the "development" branch of each repository. The operation also uses a user supplied Git Access Token called "abc123".
+Download just one repository in the "my-org" Git organization called "my-service-api". Default settings are overriden where the operation will run with a DEBUG log level and the operation will run only on the "development" branch of each repository. The operation also uses a user supplied Git Access Token called "abc123".
 
 npx gitops scrape-repository
-    -o ragnarok
+    -o my-org
     -l DEBUG
     -f heads/development
     -t abc123
-    -r assistant-service-api
-        `
+    -r my-service-api
+
+The command, be default, will skip downloading a repository when it detects that the target download path already has a folder with the repository name.
+This can be overriden by supplying --overwrite-existing option to the command:
+
+npx gitops scrape-repository
+    -o my-org
+    -l DEBUG
+    -f heads/development
+    -t abc123
+    -r my-service-api
+    --overwrite-existing
+
+If both --overwrite-existing and --skip-existing are spcified, then the command will fall back to its default operation mode which is to only skip existing repositories.
+
+The command includes the ability to extarct the downloaded repository package. The extracted tarball contents will be placed in the same folder as the tarball itself:
+
+npx gitops scrape-repository
+    -o my-org
+-l DEBUG
+    -f heads/development
+    -t abc123
+    -r my-service-api
+    --extract-download
+
+`
         )
         .addOption(dryRunOption)
+        .addOption(skipExistingOption)
+        .addOption(overwriteExistingOption)
         .addOption(tokenFilePathOption)
         .addOption(githubTokenOption)
         .addOption(logLevelOption)
@@ -58,8 +90,25 @@ npx gitops scrape-repository
         .addOption(repositoriesOption)
         .addOption(repositoryListOption)
         .addOption(excludeRepositoriesOption)
+        .addOption(extractDownloadOption)
         .action(async (options: GitOpsCommands['ScrapeRepository']) => {
-            const action = new ScrapeRepositoryAction(options);
-            await action.run();
+            try {
+                let sanitizedOptions = options;
+                if (options.overwriteExisting && options.skipExisting) {
+                    sanitizedOptions = {
+                        ...options,
+                        overwriteExisting: false,
+                        skipExisting: true
+                    };
+                }
+
+                const action = new ScrapeRepositoryAction(sanitizedOptions);
+
+                await action.run();
+            } catch (e) {
+                program.help({
+                    error: true
+                });
+            }
         });
 };

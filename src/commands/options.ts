@@ -1,5 +1,5 @@
 import { Option } from 'commander';
-import { LogLevel } from '../utils/logger.util';
+import { LogLevel } from '@utils/logger.util';
 
 export const dryRunOption = new Option(
     `-u, --dry-run`,
@@ -137,3 +137,18 @@ export const overrideExistingScriptKeyOption = new Option(
 )
     .makeOptionMandatory(false)
     .default(false);
+
+export const overwriteExistingOption = new Option(
+    `--overwrite-existing`,
+    `Replaces any content that exists in the target path of the download in the local filesystem`
+).makeOptionMandatory(false);
+
+export const skipExistingOption = new Option(
+    `--skip-existing`,
+    `Skips any content that exists in the target path of the download in the local filesystem`
+).makeOptionMandatory(false);
+
+export const extractDownloadOption = new Option(
+    `--extract-download`,
+    `Extracts the downloaded repository in the target folder`
+).makeOptionMandatory(false);

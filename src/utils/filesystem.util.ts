@@ -1,10 +1,10 @@
 import { WriteFileOptions, realpathSync } from 'fs';
 import { relative, dirname, join } from 'path';
-import os from 'os';
 import fse from 'fs-extra';
-import { LoggerUtil } from './logger.util';
+import { LoggerUtil } from '@utils/logger.util';
 import { fileURLToPath } from 'url';
 import { globby, Options as GlobbyOptions } from 'globby';
+import os from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -18,19 +18,10 @@ export type FilesystemWriteFileOptions = WriteFileOptions;
 
 export type GlobOptions = GlobbyOptions;
 
-export type ModuleConf = Readonly<{
-    gitTokenFilePath?: string;
-    gitApiBase?: string;
-}>;
-
 export class FilesystemUtil {
     private static readonly CLASS_NAME = 'FilesystemUtil';
 
     public static readonly TMP_DIR = '.tmp';
-
-    public static readonly MODULE_CONF_FILE = `${os.homedir()}/.${
-        process.env.MODULE_NAME
-    }rc.json`;
 
     private readonly logger: LoggerUtil;
 
@@ -38,27 +29,13 @@ export class FilesystemUtil {
         this.logger = options.logger;
     }
 
-    public readConfiguration(encoding: BufferEncoding = 'utf8'): ModuleConf {
-        try {
-            const json = fse.readJSONSync(FilesystemUtil.MODULE_CONF_FILE, {
-                encoding
-            });
-
-            if (Object.keys(json).length === 0) {
-                throw new Error();
-            }
-
-            return json as ModuleConf;
-        } catch (e) {
-            this.logger.info(
-                `[${FilesystemUtil.CLASS_NAME}.readConfiguration]`,
-                `No usable configuration file found at ${FilesystemUtil.MODULE_CONF_FILE}\n`
-            );
-
-            return {};
-        }
+    /**
+     * Get the operating system home directory
+     * @returns the path to the home directory
+     */
+    public getHomeDirectory(): string {
+        return os.homedir();
     }
-
     /**
      * A simple synchronous file reader
      * @param filePath The path to the file to read
@@ -147,6 +124,38 @@ export class FilesystemUtil {
     }
 
     /**
+     * Writes a buffer to the file system at the given path.
+     *
+     * @example
+     * ```typescript
+     * FilesystemUtil.writeFileFromBuffer(
+     *     (await import('path')).join(__dirname, '/myFile.json'),
+     *      response.data as ArrayBuffer
+     * );
+     * ```
+     * @param filePath The file path
+     * @param content The JSON object to write
+     * @param options Options for the fs-extra command
+     * @returns
+     */
+    public writeFileFromBuffer(
+        filePath: string,
+        buffer: Buffer,
+        options?: WriteFileOptions
+    ) {
+        try {
+            fse.appendFileSync(filePath, buffer, options);
+        } catch (e) {
+            this.logger.error(
+                `[${FilesystemUtil.CLASS_NAME}.writeFileFromBuffer]`,
+                `Failed to write buffer to ${filePath}\n`,
+                e
+            );
+            return undefined;
+        }
+    }
+
+    /**
      * Determine if the given value is a valid json object
      * @param value The value that might be a valid json object
      * @returns
@@ -227,6 +236,10 @@ export class FilesystemUtil {
         }
     }
 
+    public doesFolderExist(fullpath: string): boolean {
+        return fse.pathExistsSync(fullpath);
+    }
+
     public createFolder(fullpath: string): string {
         if (!fse.existsSync(fullpath)) {
             fse.mkdirSync(fullpath);
@@ -235,9 +248,9 @@ export class FilesystemUtil {
         return fullpath;
     }
 
-    public removeDirectory(path: string): boolean {
+    public removeDirectory(path: string, options?: fse.RmOptions): boolean {
         try {
-            fse.removeSync(path);
+            fse.rmSync(path, options);
             return true;
         } catch (e) {
             this.logger.error(

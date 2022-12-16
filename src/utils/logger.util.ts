@@ -1,4 +1,4 @@
-import { MODULE_NAME, MODULE_VERSION } from '../index';
+import { MODULE_NAME, MODULE_VERSION } from '@root';
 import chalk from 'chalk';
 import lodash from 'lodash';
 import { Console } from 'console';

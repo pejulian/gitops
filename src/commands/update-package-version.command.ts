@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { GitOpsCommands } from '../index';
+import { GitOpsCommands } from '@root';
 import {
     tokenFilePathOption,
     githubTokenOption,
@@ -15,8 +15,8 @@ import {
     packageUpdateConstraintOption,
     packageVersionOption,
     dryRunOption
-} from './options';
-import { UpdatePackageVersionAction } from '../actions/update-package-version.action';
+} from '@commands/options';
+import { UpdatePackageVersionAction } from '@actions/update-package-version.action';
 
 export const createCommand = (program: Command) => {
     program
@@ -92,7 +92,11 @@ npx gitops update-package-version
         .addOption(packageUpdateConditionOption)
         .addOption(packageUpdateConstraintOption)
         .action(async (options: GitOpsCommands['UpdatePackageVersion']) => {
-            const action = new UpdatePackageVersionAction(options);
-            await action.run();
+            try {
+                const action = new UpdatePackageVersionAction(options);
+                await action.run();
+            } catch (e) {
+                program.help({ error: true });
+            }
         });
 };

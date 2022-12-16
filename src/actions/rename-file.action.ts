@@ -1,15 +1,15 @@
 import _ from 'lodash';
-import { GitOpsCommands } from '../index';
+import { GitOpsCommands } from '@root';
 import {
     FilesystemUtil,
     FilesystemWriteFileOptions
-} from '../utils/filesystem.util';
+} from '@utils/filesystem.util';
 import {
     GitTreeWithFileDescriptor,
     GitHubRepository
-} from '../utils/github.util';
-import { LoggerUtil, LogLevel } from '../utils/logger.util';
-import { GenericAction } from './generic.action';
+} from '@utils/github.util';
+import { LoggerUtil, LogLevel } from '@utils/logger.util';
+import { GenericAction } from '@actions/generic.action';
 
 export type RenameFileActionOptions = GitOpsCommands['RenameFile'];
 

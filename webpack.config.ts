@@ -1,6 +1,7 @@
 import webpack from 'webpack';
 import { resolve } from 'path';
 import TerserPlugin from 'terser-webpack-plugin';
+import TsConfigPathsPlugin from 'tsconfig-paths-webpack-plugin';
 
 // top level await made possible with module es2022
 const packageJson = (
@@ -40,7 +41,8 @@ const baseConfig: Partial<webpack.Configuration> = {
         ]
     },
     resolve: {
-        extensions: ['.ts', '.js']
+        extensions: ['.ts', '.js'],
+        plugins: [new TsConfigPathsPlugin({})]
     },
     plugins
 };

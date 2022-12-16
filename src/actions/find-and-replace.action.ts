@@ -1,15 +1,15 @@
-import { GitOpsCommands } from '../index';
+import { GitOpsCommands } from '@root';
 import {
     FilesystemUtil,
     FilesystemWriteFileOptions
-} from '../utils/filesystem.util';
+} from '@utils/filesystem.util';
 import {
     GitHubRepository,
     GitTreeItem,
     FlattenedGitTree
-} from '../utils/github.util';
-import { LoggerUtil, LogLevel } from '../utils/logger.util';
-import { GenericAction } from './generic.action';
+} from '@utils/github.util';
+import { LoggerUtil, LogLevel } from '@utils/logger.util';
+import { GenericAction } from '@actions/generic.action';
 
 export type FindAndReplaceActionOptions = GitOpsCommands['FindAndReplace'];
 

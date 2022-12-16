@@ -1,6 +1,6 @@
 import { Command } from 'commander';
-import { FindAndReplaceAction } from '../actions/find-and-replace.action';
-import { GitOpsCommands } from '../index';
+import { FindAndReplaceAction } from '@actions/find-and-replace.action';
+import { GitOpsCommands } from '@root';
 import {
     tokenFilePathOption,
     githubTokenOption,
@@ -15,7 +15,7 @@ import {
     filesToMatchOption,
     searchForFlagsOption,
     dryRunOption
-} from './options';
+} from '@commands/options';
 
 export const createCommand = (program: Command) => {
     program
@@ -77,7 +77,11 @@ npx gitops find-and-replace
         .addOption(replaceWithOption)
         .addOption(filesToMatchOption)
         .action(async (options: GitOpsCommands['FindAndReplace']) => {
-            const action = new FindAndReplaceAction(options);
-            await action.run();
+            try {
+                const action = new FindAndReplaceAction(options);
+                await action.run();
+            } catch (e) {
+                program.help({ error: true });
+            }
         });
 };
