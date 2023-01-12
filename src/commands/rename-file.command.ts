@@ -1,9 +1,7 @@
 import { Command } from 'commander';
-import { GitOpsCommands } from '@root';
-import { RenameFileAction } from '@actions/rename-file.action';
+import { GitOpsCommands } from '../index';
+import { RenameFileAction } from '../actions/rename-file.action';
 import {
-    tokenFilePathOption,
-    githubTokenOption,
     logLevelOption,
     refOption,
     organizationsOption,
@@ -12,8 +10,9 @@ import {
     excludeRepositoriesOption,
     targetFilePathOption,
     newFileNameOption,
-    dryRunOption
-} from '@commands/options';
+    dryRunOption,
+    gitConfigNameOption
+} from './options';
 
 export const createCommand = (program: Command) => {
     program
@@ -26,13 +25,12 @@ export const createCommand = (program: Command) => {
 Rename a file identified by its file path in one, many or all repositories for a given Git organization.
 
 -o ORGANIZATIONS,..., n  
+-c, --git-config-name default
 --target-file-path path/to/file/in/repo/file.extension 
 --new-file-name newFileName.extension 
 [
-    -p GITBUB_TOKEN_FILE_PATH 
-    -t GITHUB_TOKEN 
     -l ERROR|WARN|INFO|DEBUG 
-    -f GIT_REF 
+    -f, --ref GIT_REF 
     -r RegExp 
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
@@ -48,21 +46,19 @@ npx gitops rename-file
     --target-file-path scripts/my-settings.json
     --new-file-name their-settings.json
 
-Run a rename operation for just one repository in the "fooz" Git organization called "ball" where the the file at path "scripts/prod-settings.json" will be renamed to "scripts/dev-settings.json". Default settings are overriden where the operation will run with a DEBUG log level and the operation will run only on the "development" branch of each repository, if it exists. The operation also uses a user supplied Git Personal Access Token: "abc123".
+Run a rename operation for just one repository in the "fooz" Git organization called "ball" where the the file at path "scripts/prod-settings.json" will be renamed to "scripts/dev-settings.json". Default settings are overriden where the operation will run with a DEBUG log level and the operation will run only on the "development" branch of each repository, if it exists.
 
 npx gitops rename-file
     -o fooz
     -l DEBUG
     -f heads/development
-    -t abc123
     -r ball
     --target-file-path scripts/prod-settings.json
     --new-file-name dev-settings.json
         `
         )
         .addOption(dryRunOption)
-        .addOption(tokenFilePathOption)
-        .addOption(githubTokenOption)
+        .addOption(gitConfigNameOption)
         .addOption(logLevelOption)
         .addOption(refOption)
         .addOption(organizationsOption)

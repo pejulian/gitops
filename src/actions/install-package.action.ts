@@ -1,13 +1,13 @@
 import _ from 'lodash';
-import { GitOpsCommands } from '@root';
+import { GitOpsCommands } from '../index';
 import {
     GitHubRepository,
     GitTreeItem,
     GitTreeWithFileDescriptor
-} from '@utils/github.util';
-import { LoggerUtil, LogLevel } from '@utils/logger.util';
-import { InstallModes, NpmUtil, PackageTypes } from '@utils/npm.util';
-import { GenericAction } from '@actions/generic.action';
+} from '../utils/github.util';
+import { LoggerUtil, LogLevel } from '../utils/logger.util';
+import { InstallModes, NpmUtil, PackageTypes } from '../utils/npm.util';
+import { GenericAction } from './generic.action';
 
 export type InstallPackageActionOptions = GitOpsCommands['InstallPackage'];
 
@@ -22,9 +22,8 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
         InstallPackageAction.CLASS_NAME = 'InstallPackageAction';
 
         super({
-            githubToken: options.githubToken,
+            gitConfigName: options.gitConfigName,
             logLevel: LogLevel[options.logLevel as keyof typeof LogLevel],
-            tokenFilePath: options.tokenFilePath,
             organizations: options.organizations,
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
@@ -145,15 +144,16 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                 let descriptorWithTree: GitTreeWithFileDescriptor;
 
                 try {
-                    const findResults =
-                        await this.githubUtil.findTreeAndDescriptorForFilePath(
-                            repository,
-                            [
-                                NpmUtil.PACKAGE_JSON_FILE_NAME,
-                                NpmUtil.LOCKFILE_FILE_NAME
-                            ],
-                            this.ref ?? `heads/${repository.default_branch}`
-                        );
+                    const findResults = await this.useGithubUtils(
+                        this.gitConfigName
+                    ).findTreeAndDescriptorForFilePath(
+                        repository,
+                        [
+                            NpmUtil.PACKAGE_JSON_FILE_NAME,
+                            NpmUtil.LOCKFILE_FILE_NAME
+                        ],
+                        this.ref ?? `heads/${repository.default_branch}`
+                    );
 
                     if (findResults?.descriptors.length !== 2) {
                         this.logger.warn(
@@ -227,7 +227,9 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
                     });
 
                     try {
-                        await this.githubUtil.uploadToRepository(
+                        await this.useGithubUtils(
+                            this.gitConfigName
+                        ).uploadToRepository(
                             repoPath,
                             repository,
                             `Install ${this.packageName} with version ${
@@ -301,13 +303,11 @@ export class InstallPackageAction extends GenericAction<InstallPackageActionResp
         const descriptorWithContents: Array<DescriptorWithContents> = [];
         try {
             for await (const descriptor of descriptors) {
-                const content = await this.githubUtil.getFileDescriptorContent(
-                    repository,
-                    descriptor,
-                    {
-                        ref: this.ref ?? `heads/${repository.default_branch}`
-                    }
-                );
+                const content = await this.useGithubUtils(
+                    this.gitConfigName
+                ).getFileDescriptorContent(repository, descriptor, {
+                    ref: this.ref ?? `heads/${repository.default_branch}`
+                });
                 descriptorWithContents.push({
                     content,
                     descriptor

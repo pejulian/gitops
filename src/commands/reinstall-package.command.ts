@@ -1,9 +1,7 @@
 import { Command } from 'commander';
-import { ReinstallPackageAction } from '@actions/reinstall-package.action';
-import { GitOpsCommands } from '@root';
+import { ReinstallPackageAction } from '../actions/reinstall-package.action';
+import { GitOpsCommands } from '../index';
 import {
-    tokenFilePathOption,
-    githubTokenOption,
     logLevelOption,
     refOption,
     organizationsOption,
@@ -15,8 +13,9 @@ import {
     packageUpdateConditionOption,
     packageUpdateConstraintOption,
     packageVersionOption,
-    dryRunOption
-} from '@commands/options';
+    dryRunOption,
+    gitConfigNameOption
+} from './options';
 
 export const createCommand = (program: Command) => {
     program
@@ -29,13 +28,14 @@ export const createCommand = (program: Command) => {
 Reinstall an existing package in the effected repositories for the given organizations.
 
 -o ORGANIZATIONS,..., n 
+-c, --git-config-name default
 -n PACKAGE_NAME
 -v SEMVER 
-[   -p GITBUB_TOKEN_FILE_PATH 
-    -t GITHUB_TOKEN 
+[   
     -l ERROR|WARN|INFO|DEBUG 
-    -f GIT_REF 
+    -f, --ref GIT_REF 
     -r RegExp 
+    -y, --package-type s|o|d
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
     --package-update-constraint SEMVER 
@@ -64,7 +64,7 @@ npx gitops reinstall-package
   -n "fancy-deploy"
   -f "heads/dev"
   -v "latest"
-  -t d
+  -y d
   --package-update-constraint "1.9.0"
   --package-update-condition lte
 
@@ -74,12 +74,11 @@ npx gitops reinstall-package
   -o my-org
   -n "webpack"
   -v "latest"
-  -t o
+  -y o
 `
         )
         .addOption(dryRunOption)
-        .addOption(tokenFilePathOption)
-        .addOption(githubTokenOption)
+        .addOption(gitConfigNameOption)
         .addOption(logLevelOption)
         .addOption(refOption)
         .addOption(organizationsOption)

@@ -1,13 +1,14 @@
-import _ from 'lodash';
-import { GitOpsCommands } from '@root';
+import { GitOpsCommands } from '../index';
 import {
     GitHubRepository,
     GitTreeItem,
     GitTreeWithFileDescriptor
-} from '@utils/github.util';
-import { LoggerUtil, LogLevel } from '@utils/logger.util';
-import { NpmUtil } from '@utils/npm.util';
-import { GenericAction } from '@actions/generic.action';
+} from '../utils/github.util';
+import { LoggerUtil, LogLevel } from '../utils/logger.util';
+import { NpmUtil } from '../utils/npm.util';
+import { GenericAction } from './generic.action';
+import _find from 'lodash/find';
+import _remove from 'lodash/remove';
 
 export type RemovePackageJsonScriptActionOptions =
     GitOpsCommands['RemovePackageJsonScript'];
@@ -22,9 +23,8 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
             'RemovePackageJsonScriptAction';
 
         super({
-            githubToken: options.githubToken,
+            gitConfigName: options.gitConfigName,
             logLevel: LogLevel[options.logLevel as keyof typeof LogLevel],
-            tokenFilePath: options.tokenFilePath,
             organizations: options.organizations,
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
@@ -108,12 +108,13 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                  * Find package.json
                  */
                 try {
-                    const findResults =
-                        await this.githubUtil.findTreeAndDescriptorForFilePath(
-                            repository,
-                            [NpmUtil.PACKAGE_JSON_FILE_NAME],
-                            this.ref ?? `heads/${repository.default_branch}`
-                        );
+                    const findResults = await this.useGithubUtils(
+                        this.gitConfigName
+                    ).findTreeAndDescriptorForFilePath(
+                        repository,
+                        [NpmUtil.PACKAGE_JSON_FILE_NAME],
+                        this.ref ?? `heads/${repository.default_branch}`
+                    );
 
                     if (findResults?.descriptors.length !== 1) {
                         this.logger.warn(
@@ -176,8 +177,8 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
 
                 if (!this.dryRun) {
                     // Remove any file descriptors that match
-                    _.remove(descriptorWithTree.tree.tree, (treeItem) => {
-                        const shaMatch = _.find(
+                    _remove(descriptorWithTree.tree.tree, (treeItem) => {
+                        const shaMatch = _find(
                             descriptorWithTree.descriptors,
                             (item) => item.sha === treeItem.sha
                         );
@@ -186,7 +187,9 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
                     });
 
                     try {
-                        await this.githubUtil.uploadToRepository(
+                        await this.useGithubUtils(
+                            this.gitConfigName
+                        ).uploadToRepository(
                             repoPath,
                             repository,
                             `Removed "${this.scriptKey}" from "scripts" in ${NpmUtil.PACKAGE_JSON_FILE_NAME}`,
@@ -257,13 +260,11 @@ export class RemovePackageJsonScriptAction extends GenericAction<RemovePackageJs
         // Get file descriptor and content
         let descriptorWithContents: DescriptorWithContents;
         try {
-            const content = await this.githubUtil.getFileDescriptorContent(
-                repository,
-                descriptor,
-                {
-                    ref: this.ref ?? `heads/${repository.default_branch}`
-                }
-            );
+            const content = await this.useGithubUtils(
+                this.gitConfigName
+            ).getFileDescriptorContent(repository, descriptor, {
+                ref: this.ref ?? `heads/${repository.default_branch}`
+            });
 
             descriptorWithContents = {
                 content,

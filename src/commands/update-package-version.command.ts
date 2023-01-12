@@ -1,8 +1,6 @@
 import { Command } from 'commander';
-import { GitOpsCommands } from '@root';
+import { GitOpsCommands } from '../index';
 import {
-    tokenFilePathOption,
-    githubTokenOption,
     logLevelOption,
     refOption,
     organizationsOption,
@@ -14,9 +12,10 @@ import {
     packageUpdateConditionOption,
     packageUpdateConstraintOption,
     packageVersionOption,
-    dryRunOption
-} from '@commands/options';
-import { UpdatePackageVersionAction } from '@actions/update-package-version.action';
+    dryRunOption,
+    gitConfigNameOption
+} from './options';
+import { UpdatePackageVersionAction } from '../actions/update-package-version.action';
 
 export const createCommand = (program: Command) => {
     program
@@ -29,12 +28,13 @@ export const createCommand = (program: Command) => {
 Updates the version of an existing npm package in package.json for all affected repositories in the given organizations.
 
 -o ORGANIZATIONS,..., n 
+-c, --git-config-name default
 -n PACKAGE_NAME
 -v SEMVER 
-[   -p GITBUB_TOKEN_FILE_PATH 
-    -t GITHUB_TOKEN 
+[  
     -l ERROR|WARN|INFO|DEBUG 
-    -f GIT_REF 
+    -f, --ref GIT_REF 
+    -y, --package-type s|o|d
     -r RegExp 
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
@@ -64,7 +64,7 @@ npx gitops update-package-version
   -n "fancy-deploy"
   -f "heads/dev"
   -v "latest"
-  -t d
+  -y d
   --package-update-constraint "1.9.0"
   --package-update-condition lte
 
@@ -74,12 +74,11 @@ npx gitops update-package-version
   -o my-org
   -n "webpack"
   -v "latest"
-  -t d
+  -y d
 `
         )
         .addOption(dryRunOption)
-        .addOption(tokenFilePathOption)
-        .addOption(githubTokenOption)
+        .addOption(gitConfigNameOption)
         .addOption(logLevelOption)
         .addOption(refOption)
         .addOption(organizationsOption)

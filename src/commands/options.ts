@@ -1,22 +1,15 @@
 import { Option } from 'commander';
-import { LogLevel } from '@utils/logger.util';
+import { LogLevel } from '../utils/logger.util';
 
 export const dryRunOption = new Option(
     `-u, --dry-run`,
     `When this flag is set, the action will be performed without committing the changes to the remote repository`
 )
-    .default(false)
+    .default(
+        false,
+        'By default, operations performed will be committed/executed.'
+    )
     .makeOptionMandatory(false);
-
-export const tokenFilePathOption = new Option(
-    '-p, --token-file-path <value>',
-    "[OPTIONAL] A path to the file in your user's home directory where the GitHub Personal Access Token is stored. Defaults to $HOME/.git-token if not specified and no key called 'gitTokenFilePath' was specified in '.gitopsrc.json'"
-);
-
-export const githubTokenOption = new Option(
-    '-t, --github-token <value>',
-    '[OPTIONAL] A GitHub Personal Access Token that will be used when running Git commands against the GitHub service. Will override the token file path option if defined.'
-);
 
 export const organizationsOption = new Option(
     '-o, --organizations [value...]',
@@ -32,12 +25,22 @@ export const logLevelOption = new Option(
             (value) => typeof value === 'string'
         ) as string[]
     )
-    .default('INFO');
+    .default('INFO', 'By default, the log level "INFO" is used');
 
 export const refOption = new Option(
     '-f, --ref <value>',
     '[OPTIONAL] A specific reference of the repository to narrow down on. If specifying a branch, the format must be `heads/branch_name`. If specifying a tag, the format must be `tags/tag_name`. If not supplied, most commands will fallback to use the default branch of the repository.'
 );
+
+export const gitConfigNameOption = new Option(
+    `-c, --git-config-name <value>`,
+    `The git config name as defined in .gitopsrc.json. This should be a valid configuration that has been created in a file called .gitopsrc.json in the user's home directory`
+)
+    .makeOptionMandatory(true)
+    .default(
+        `default`,
+        'If a value is not provided, the value "default" will be used.'
+    );
 
 export const repositoriesOption = new Option(
     '-r, --repositories <value>',
@@ -79,7 +82,10 @@ export const packageTypeOption = new Option(
     `[OPTIONAL] The type of dependency. Specify "s" for a normal dependency, "d" for devDependencies or "o" for optionalDependencies`
 )
     .choices(['s', 'd', 'o'])
-    .default('s');
+    .default(
+        's',
+        'By default, all operations using this option will run on normal dependencies.'
+    );
 
 export const packageUpdateConstraintOption = new Option(
     `--package-update-constraint <value>`,
@@ -133,10 +139,13 @@ export const scriptValueOption = new Option(
 
 export const overrideExistingScriptKeyOption = new Option(
     `-d, --override-existing-script-key`,
-    `If specified, relevant operaations will override existing keys if found in the "scripts" section of "package.json"`
+    `If specified, relevant operations will override existing keys if found in the "scripts" section of "package.json"`
 )
     .makeOptionMandatory(false)
-    .default(false);
+    .default(
+        false,
+        'By default, the operation will not override existing scripts'
+    );
 
 export const overwriteExistingOption = new Option(
     `--overwrite-existing`,

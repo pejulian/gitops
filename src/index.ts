@@ -11,18 +11,6 @@ export type GitOpsCommands = {
          */
         organizations: Array<string>;
         /**
-         * The raw github personal access token value to use.
-         * Will take precedence over `tokenFilePath` if defined.
-         */
-        githubToken?: string;
-        /**
-         * The path to the github personal access token file that has been stored
-         * somewhere in the users' home directory.
-         *
-         * NOTE: The file must reside in the root or subdirectory OF THE USERS HOME DIRECTORY
-         */
-        tokenFilePath?: string;
-        /**
          * The log level to apply when making log statements
          */
         logLevel: string;
@@ -46,6 +34,11 @@ export type GitOpsCommands = {
          * When true, perform the action without committing changes to Git
          */
         dryRun: boolean;
+        /**
+         * The named of the git config to use.
+         * This name (and corresponding config) should exist in .gitopsrc.json
+         */
+        gitConfigName: string;
     }>;
     CommonPackageConstraints: Readonly<{
         packageUpdateConstraint?: string;
@@ -82,7 +75,7 @@ export type GitOpsCommands = {
         packageType: 'd' | 's' | 'o';
     }> &
         GitOpsCommands['Common'];
-    ScrapeRepository: Readonly<{
+    DownloadRepository: Readonly<{
         skipExisting?: boolean;
         overwriteExisting?: boolean;
         extractDownload?: boolean;
@@ -105,6 +98,7 @@ export type GitOpsCommands = {
         overrideExistingScriptKey: boolean;
     }> &
         GitOpsCommands['Common'];
+    AddGitRemote: GitOpsCommands['Common'];
 };
 
 console.log(`\n${MODULE_NAME} ${MODULE_VERSION}\n`);

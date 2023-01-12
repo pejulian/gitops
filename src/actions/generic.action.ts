@@ -1,13 +1,13 @@
-import { GitOpsCommands } from '@root';
-import { FilesystemUtil } from '@utils/filesystem.util';
-import { GitHubRepository, GithubUtil } from '@utils/github.util';
-import { LoggerUtil, LogLevel } from '@utils/logger.util';
-import { NpmUtil } from '@utils/npm.util';
-import { ProcessorUtil } from '@utils/processsor.util';
-import { SemverUtil } from '@utils/semver.util';
-import { ConfigUtil } from '@utils/config.util';
-import { TarUtil } from '@utils/tar.util';
-import { ActionReporter } from '@reporters/action.reporter';
+import { GitOpsCommands } from '../index';
+import { FilesystemUtil } from '../utils/filesystem.util';
+import { GitHubRepository, GithubUtil } from '../utils/github.util';
+import { LoggerUtil, LogLevel } from '../utils/logger.util';
+import { NpmUtil } from '../utils/npm.util';
+import { ProcessorUtil } from '../utils/processsor.util';
+import { SemverUtil } from '../utils/semver.util';
+import { ConfigUtil } from '../utils/config.util';
+import { TarUtil } from '../utils/tar.util';
+import { ActionReporter } from '../reporters/action.reporter';
 
 export interface IGenericAction<T> {
     run(): Promise<T>;
@@ -29,7 +29,7 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
     protected static CLASS_NAME = 'GenericAction';
 
     protected readonly logger: LoggerUtil;
-    protected readonly githubUtil: GithubUtil;
+    protected readonly githubUtils: Record<string, GithubUtil> = {};
     protected readonly filesystemUtil: FilesystemUtil;
     protected readonly processorUtil: ProcessorUtil;
     protected readonly semverUtil: SemverUtil;
@@ -39,6 +39,7 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
 
     protected readonly actionReporter: ActionReporter;
 
+    protected readonly gitConfigName: string;
     protected organizations: Array<string>;
     protected repositories: string | undefined;
     protected excludeRepositories: Array<string> | undefined;
@@ -50,6 +51,8 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
         GenericAction.CLASS_NAME = options.command;
 
         const logLevel = options.logLevel ?? LogLevel.ERROR;
+
+        this.gitConfigName = options.gitConfigName;
 
         this.logger = new LoggerUtil(logLevel, options.command);
 
@@ -76,22 +79,27 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
             logger: this.logger
         });
 
-        this.configUtil = new ConfigUtil({
-            logger: this.logger
-        });
-
         this.tarUtil = new TarUtil({
             logger: this.logger
         });
 
-        this.githubUtil = new GithubUtil({
-            logger: this.logger,
-            githubToken: options.githubToken,
-            tokenFilePath: options.tokenFilePath,
-            filesystemUtil: this.filesystemUtil,
-            configUtil: this.configUtil,
-            tarUtil: this.tarUtil
+        this.configUtil = new ConfigUtil({
+            logger: this.logger
         });
+
+        const configurationList = this.configUtil.readConfigurationList();
+        Object.entries(configurationList).forEach(
+            ([configName, configOpts]) => {
+                this.githubUtils[configName] = new GithubUtil({
+                    logger: this.logger,
+                    githubToken: configOpts.gitTokenFilePath,
+                    tokenFilePath: configOpts.gitApiBase,
+                    filesystemUtil: this.filesystemUtil,
+                    configUtil: this.configUtil,
+                    tarUtil: this.tarUtil
+                });
+            }
+        );
 
         this.excludeRepositories = options.excludeRepositories;
         this.repositories = options.repositories;
@@ -122,15 +130,13 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
         let repositories: Array<GitHubRepository> = [];
 
         try {
-            repositories =
-                await this.githubUtil.listRepositoriesForOrganization(
-                    organization,
-                    {
-                        onlyInclude: this.repositories,
-                        excludeRepositories: this.excludeRepositories,
-                        onlyFromList: this.repositoryList
-                    }
-                );
+            repositories = await this.useGithubUtils(
+                this.gitConfigName
+            ).listRepositoriesForOrganization(organization, {
+                onlyInclude: this.repositories,
+                excludeRepositories: this.excludeRepositories,
+                onlyFromList: this.repositoryList
+            });
 
             this.logger.debug(
                 `[${GenericAction.CLASS_NAME}.listApplicableRepositoriesForOperation]`,
@@ -153,5 +159,21 @@ export abstract class GenericAction<T> implements IGenericAction<T> {
         }
 
         return repositories;
+    }
+
+    protected useGithubUtils(configName: string): GithubUtil {
+        try {
+            if (Object.keys(this.githubUtils).includes(configName)) {
+                return this.githubUtils[configName];
+            }
+            throw new Error(`No such config ${configName}`);
+        } catch (e) {
+            this.logger.error(
+                `${GenericAction.CLASS_NAME}.useGithubUtils`,
+                `An error occured while resolving correct settings to use for git.\n`,
+                e
+            );
+            throw e;
+        }
     }
 }

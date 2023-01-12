@@ -1,9 +1,7 @@
 import { Command } from 'commander';
-import { FindAndReplaceAction } from '@actions/find-and-replace.action';
-import { GitOpsCommands } from '@root';
+import { FindAndReplaceAction } from '../actions/find-and-replace.action';
+import { GitOpsCommands } from '../index';
 import {
-    tokenFilePathOption,
-    githubTokenOption,
     logLevelOption,
     refOption,
     organizationsOption,
@@ -14,8 +12,9 @@ import {
     replaceWithOption,
     filesToMatchOption,
     searchForFlagsOption,
-    dryRunOption
-} from '@commands/options';
+    dryRunOption,
+    gitConfigNameOption
+} from './options';
 
 export const createCommand = (program: Command) => {
     program
@@ -28,13 +27,13 @@ export const createCommand = (program: Command) => {
 Finds and replace matches of the supplied regex for a given list of files in relevant repositories for the given Git organizations.
 
 -o ORGANIZATIONS,..., n 
+-c, --git-config-name default
 --search-for
 --files-to-match
 --replace-with
-[   -p GITBUB_TOKEN_FILE_PATH 
-    -t GITHUB_TOKEN 
+[    
     -l ERROR|WARN|INFO|DEBUG 
-    -f GIT_REF 
+    -f, --ref GIT_REF 
     -r RegExp 
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
@@ -64,8 +63,7 @@ npx gitops find-and-replace
 `
         )
         .addOption(dryRunOption)
-        .addOption(tokenFilePathOption)
-        .addOption(githubTokenOption)
+        .addOption(gitConfigNameOption)
         .addOption(logLevelOption)
         .addOption(refOption)
         .addOption(organizationsOption)

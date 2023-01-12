@@ -1,15 +1,15 @@
-import { GitOpsCommands } from '@root';
+import { GitOpsCommands } from '../index';
 import {
     FilesystemUtil,
     FilesystemWriteFileOptions
-} from '@utils/filesystem.util';
+} from '../utils/filesystem.util';
 import {
     GitHubRepository,
     GitTreeItem,
     FlattenedGitTree
-} from '@utils/github.util';
-import { LoggerUtil, LogLevel } from '@utils/logger.util';
-import { GenericAction } from '@actions/generic.action';
+} from '../utils/github.util';
+import { LoggerUtil, LogLevel } from '../utils/logger.util';
+import { GenericAction } from './generic.action';
 
 export type FindAndReplaceActionOptions = GitOpsCommands['FindAndReplace'];
 
@@ -25,9 +25,8 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
         FindAndReplaceAction.CLASS_NAME = 'FindAndReplaceAction';
 
         super({
-            githubToken: options.githubToken,
+            gitConfigName: options.gitConfigName,
             logLevel: LogLevel[options.logLevel as keyof typeof LogLevel],
-            tokenFilePath: options.tokenFilePath,
             organizations: options.organizations,
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
@@ -103,7 +102,9 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
         let gitTree: FlattenedGitTree;
 
         try {
-            gitTree = await this.githubUtil.getRepositoryFullGitTree(
+            gitTree = await this.useGithubUtils(
+                this.gitConfigName
+            ).getRepositoryFullGitTree(
                 repository,
                 this.ref ?? `heads/${repository.default_branch}`,
                 true
@@ -128,11 +129,9 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
             let matchedDescriptor: GitTreeItem;
 
             try {
-                const result = this.githubUtil.findMatchingDescriptor(
-                    gitTree.tree,
-                    'blob',
-                    fileToMatch
-                );
+                const result = this.useGithubUtils(
+                    this.gitConfigName
+                ).findMatchingDescriptor(gitTree.tree, 'blob', fileToMatch);
 
                 if (!result) {
                     this.logger.warn(
@@ -169,13 +168,11 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
             let fileContent: string;
 
             try {
-                const result = await this.githubUtil.getFileDescriptorContent(
-                    repository,
-                    matchedDescriptor,
-                    {
-                        ref: this.ref ?? `heads/${repository.default_branch}`
-                    }
-                );
+                const result = await this.useGithubUtils(
+                    this.gitConfigName
+                ).getFileDescriptorContent(repository, matchedDescriptor, {
+                    ref: this.ref ?? `heads/${repository.default_branch}`
+                });
 
                 fileContent = result;
             } catch (e) {
@@ -270,21 +267,21 @@ export class FindAndReplaceAction extends GenericAction<FindAndReplaceActionResp
                     );
 
                     if (!this.dryRun) {
-                        const uploadResponse =
-                            await this.githubUtil.uploadToRepository(
-                                tmpDir,
-                                repository,
-                                `Find and replace ${this.searchFor} to ${this.replaceWith} in ${matchedDescriptor.path}`,
-                                this.ref ??
-                                    `heads/${repository.default_branch}`,
-                                {
-                                    descriptors: [matchedDescriptor],
-                                    tree: gitTree
-                                },
-                                {
-                                    removeSubtrees: false // set this to false because we obtained the tree recursively (meaning that all paths in the repo at represented in a single Git tree object)
-                                }
-                            );
+                        const uploadResponse = await this.useGithubUtils(
+                            this.gitConfigName
+                        ).uploadToRepository(
+                            tmpDir,
+                            repository,
+                            `Find and replace ${this.searchFor} to ${this.replaceWith} in ${matchedDescriptor.path}`,
+                            this.ref ?? `heads/${repository.default_branch}`,
+                            {
+                                descriptors: [matchedDescriptor],
+                                tree: gitTree
+                            },
+                            {
+                                removeSubtrees: false // set this to false because we obtained the tree recursively (meaning that all paths in the repo at represented in a single Git tree object)
+                            }
+                        );
 
                         this.actionReporter.addSuccessful({
                             name: repository.full_name,

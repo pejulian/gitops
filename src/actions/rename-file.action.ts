@@ -1,15 +1,15 @@
 import _ from 'lodash';
-import { GitOpsCommands } from '@root';
+import { GitOpsCommands } from '../index';
 import {
     FilesystemUtil,
     FilesystemWriteFileOptions
-} from '@utils/filesystem.util';
+} from '../utils/filesystem.util';
 import {
     GitTreeWithFileDescriptor,
     GitHubRepository
-} from '@utils/github.util';
-import { LoggerUtil, LogLevel } from '@utils/logger.util';
-import { GenericAction } from '@actions/generic.action';
+} from '../utils/github.util';
+import { LoggerUtil, LogLevel } from '../utils/logger.util';
+import { GenericAction } from './generic.action';
 
 export type RenameFileActionOptions = GitOpsCommands['RenameFile'];
 
@@ -23,9 +23,8 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
         RenameFileAction.CLASS_NAME = 'RenameFileAction';
 
         super({
-            githubToken: options.githubToken,
+            gitConfigName: options.gitConfigName,
             logLevel: LogLevel[options.logLevel as keyof typeof LogLevel],
-            tokenFilePath: options.tokenFilePath,
             organizations: options.organizations,
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
@@ -87,13 +86,14 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
                     } <${this.ref ?? `heads/${repository.default_branch}`}>`
                 ]);
 
-                const findResults =
-                    await this.githubUtil.findTreeAndDescriptorForFilePath(
-                        repository,
-                        [this.targetFilePath],
-                        this.ref ?? `heads/${repository.default_branch}`,
-                        true
-                    );
+                const findResults = await this.useGithubUtils(
+                    this.gitConfigName
+                ).findTreeAndDescriptorForFilePath(
+                    repository,
+                    [this.targetFilePath],
+                    this.ref ?? `heads/${repository.default_branch}`,
+                    true
+                );
 
                 if (!findResults?.descriptors?.[0]) {
                     this.logger.warn(
@@ -143,7 +143,9 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
         descriptorWithTree: GitTreeWithFileDescriptor,
         options?: FilesystemWriteFileOptions
     ) {
-        const fileContent = await this.githubUtil.getFileDescriptorContent(
+        const fileContent = await this.useGithubUtils(
+            this.gitConfigName
+        ).getFileDescriptorContent(
             repository,
             descriptorWithTree?.descriptors?.[0],
             {
@@ -186,7 +188,7 @@ export class RenameFileAction extends GenericAction<RenameFileActionResponse> {
         );
 
         if (!this.dryRun) {
-            await this.githubUtil.uploadToRepository(
+            await this.useGithubUtils(this.gitConfigName).uploadToRepository(
                 tmpDir,
                 repository,
                 `Rename ${this.targetFilePath} to ${this.newFileName}`,

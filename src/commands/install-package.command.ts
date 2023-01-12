@@ -1,9 +1,7 @@
 import { Command } from 'commander';
-import { InstallPackageAction } from '@actions/install-package.action';
-import { GitOpsCommands } from '@root';
+import { InstallPackageAction } from '../actions/install-package.action';
+import { GitOpsCommands } from '../index';
 import {
-    tokenFilePathOption,
-    githubTokenOption,
     logLevelOption,
     refOption,
     organizationsOption,
@@ -13,8 +11,9 @@ import {
     packageNameOption,
     packageTypeOption,
     packageVersionOption,
-    dryRunOption
-} from '@commands/options';
+    dryRunOption,
+    gitConfigNameOption
+} from './options';
 
 export const createCommand = (program: Command) => {
     program
@@ -27,12 +26,13 @@ export const createCommand = (program: Command) => {
 Install a new package in the effected repositories for the given organizations.
 
 -o ORGANIZATIONS,..., n 
+-c, --git-config-name default
 -n PACKAGE_NAME
 -v SEMVER 
-[   -p GITBUB_TOKEN_FILE_PATH 
-    -t GITHUB_TOKEN 
+[   
     -l ERROR|WARN|INFO|DEBUG 
-    -f GIT_REF 
+    -f, --ref GIT_REF 
+    -y, --package-type s|o|d
     -r RegExp 
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
@@ -58,7 +58,7 @@ npx gitops install-package
   -n "fancy-deploy"
   -f "heads/dev"
   -v "latest"
-  -t d
+  -y d
 
 This command will install the package "webpack" in all repositories in the GitHub organization named "my-org" in "optionalDependencies" to the latest version. The operation will run using the default level and default branch of the repository scanned.
 
@@ -66,12 +66,11 @@ npx gitops install-package
   -o my-org
   -n "webpack"
   -v "latest"
-  -t o
+  -y o
 `
         )
         .addOption(dryRunOption)
-        .addOption(tokenFilePathOption)
-        .addOption(githubTokenOption)
+        .addOption(gitConfigNameOption)
         .addOption(logLevelOption)
         .addOption(refOption)
         .addOption(organizationsOption)

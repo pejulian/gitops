@@ -1,5 +1,5 @@
 import semver from 'semver';
-import { LoggerUtil } from '@utils/logger.util';
+import { LoggerUtil } from './logger.util';
 
 export type SemverUtilOptions = Readonly<{
     logger: LoggerUtil;

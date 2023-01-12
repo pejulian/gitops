@@ -1,15 +1,17 @@
 import os from 'os';
-import _ from 'lodash';
+import _find from 'lodash/find';
+import _filter from 'lodash/filter';
+import _chain from 'lodash/chain';
 import { Agent } from 'https';
 
 import { Octokit, RestEndpointMethodTypes } from '@octokit/rest';
 import { operations, components } from '@octokit/openapi-types';
 
-import { MODULE_NAME, MODULE_VERSION } from '@root';
-import { FilesystemUtil, GlobOptions } from '@utils/filesystem.util';
-import { LoggerUtil } from '@utils/logger.util';
-import { ConfigUtil } from '@utils/config.util';
-import { TarUtil } from '@utils/tar.util';
+import { MODULE_NAME, MODULE_VERSION } from '../index';
+import { FilesystemUtil, GlobOptions } from './filesystem.util';
+import { LoggerUtil } from './logger.util';
+import { ConfigUtil } from './config.util';
+import { TarUtil } from './tar.util';
 
 export type GitHubRepository = components['schemas']['minimal-repository'];
 
@@ -133,13 +135,10 @@ export class GithubUtil {
                 
                 To ensure you have a valid authorization token:
 
-                Either create a file called ${
+                Create a file called ${
                     GithubUtil.GITHUB_TOKEN_PATH
                 } in your user home directory containing a valid PAT
 
-                OR
-
-                Supply a valid PAT via the command line argument --github-token
                 
                 To customize the file name and/or subdirectory path to a file containing your PAT, you can use the --token-file-path argument.
                 Please note however, that this path must STILL BE in your home directory ${os.homedir()}.
@@ -598,7 +597,7 @@ export class GithubUtil {
 
         const mappedBlobs: Array<CreateTree> = blobs.map(({ sha }, index) => {
             // Try to find the tree item for the blob that is being mapped in reference descriptors if provided
-            const descriptor = _.find(
+            const descriptor = _find(
                 options?.referenceDescriptors,
                 (descriptor) =>
                     descriptor.path
@@ -792,7 +791,7 @@ export class GithubUtil {
                 ...fileDescriptorWithTree,
                 tree: {
                     ...fileDescriptorWithTree.tree,
-                    tree: _.filter(
+                    tree: _filter(
                         fileDescriptorWithTree.tree.tree,
                         (treeItem) => {
                             return treeItem.type !== 'tree';
@@ -1228,6 +1227,37 @@ export class GithubUtil {
         }
     }
 
+    /**
+     * Create a repository in the given organization.
+     *
+     * @param opts Options for the repository that will be created
+     * @returns
+     */
+    public async createRepository(
+        opts: Parameters<typeof this.octokit.repos.createInOrg>[0]
+    ): Promise<
+        UnpackedPromise<
+            ReturnType<typeof this.octokit.repos.createInOrg>
+        >['data']
+    > {
+        try {
+            const response = await this.octokit.repos.createInOrg(opts);
+
+            if (response.status > 299) {
+                throw new Error(`Failed to create repository ${opts?.name}`);
+            }
+
+            return response.data;
+        } catch (e) {
+            this.logger.error(
+                `${GithubUtil.CLASS_NAME}.createRepository`,
+                `Failed to create the repository ${opts?.name}.\n`,
+                e
+            );
+            throw e;
+        }
+    }
+
     public async setCommmitBranch(
         repository: GitHubRepository,
         commitSha: string,
@@ -1273,7 +1303,7 @@ export class GithubUtil {
             `Checking tree for descriptor paths matching ${descriptorToMatch}`
         );
 
-        const match = _.chain(treeToSearch)
+        const match = _chain(treeToSearch)
             .filter(({ type }) => {
                 return type === typeToSearchFor;
             })
@@ -1326,68 +1356,98 @@ export class GithubUtil {
             extractDownload: false
         }
     ): Promise<void> {
+        let response: UnpackedPromise<
+            ReturnType<typeof this.octokit.repos.downloadTarballArchive>
+        >;
+
         try {
-            const response = await this.octokit.repos.downloadTarballArchive({
+            response = await this.octokit.repos.downloadTarballArchive({
                 owner: repository.owner.login,
                 ref,
                 repo: repository.name
             });
+        } catch (e) {
+            this.logger.error(
+                `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
+                `Failed to download tarball for ${repository.name}\n`,
+                e
+            );
 
-            // cast the status code to number before checking it because the final response has followed the original redirect response
-            // and should be reflecting the redirect response.
-            if ((response.status as unknown as number) !== 200) {
-                throw new Error(
-                    `[${response.status}] ${response.url} [${response.data}]`
-                );
-            }
+            throw e;
+        }
 
-            const buffer = response.data as ArrayBuffer;
+        if (downloadPath) {
+            if (options.overwriteExisting ?? false) {
+                if (this.filesystemUtil.doesFolderExist(downloadPath)) {
+                    this.logger.debug(
+                        `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
+                        `Replacing contents of ${repository.full_name} at existing path ${downloadPath}`
+                    );
 
-            if (downloadPath) {
-                if (options.overwriteExisting ?? false) {
-                    if (this.filesystemUtil.doesFolderExist(downloadPath)) {
-                        this.logger.info(
-                            `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
-                            `Replacing contents of ${repository.full_name} at existing path ${downloadPath}`
-                        );
+                    this.filesystemUtil.removeDirectory(downloadPath, {
+                        recursive: true,
+                        force: true
+                    });
 
-                        this.filesystemUtil.removeDirectory(downloadPath, {
-                            recursive: true,
-                            force: true
-                        });
-
-                        this.filesystemUtil.createFolder(downloadPath);
-                    }
-                } else if (options.skipExisting ?? true) {
-                    if (this.filesystemUtil.doesFolderExist(downloadPath)) {
-                        this.logger.info(
-                            `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
-                            `Skip downloading ${repository.full_name} as it already exists at path ${downloadPath}`
-                        );
-
-                        return;
-                    }
+                    this.filesystemUtil.createFolder(downloadPath);
                 }
+            } else if (options.skipExisting ?? true) {
+                if (this.filesystemUtil.doesFolderExist(downloadPath)) {
+                    this.logger.debug(
+                        `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
+                        `Skip downloading ${repository.full_name} as it already exists at path ${downloadPath}`
+                    );
 
-                this.filesystemUtil.writeFileFromBuffer(
-                    `${downloadPath}/${repository.name}.tar`,
-                    Buffer.from(buffer)
-                );
+                    return;
+                }
+            }
+        }
 
-                this.logger.info(
-                    `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
-                    `Downloaded ${repository.full_name} to ${downloadPath}`
-                );
-            } else {
+        try {
+            if (!downloadPath) {
                 this.logger.info(
                     `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
                     `Skip saving download to local file system`
                 );
+
+                return;
             }
+
+            this.logger.debug(
+                `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
+                `Will download tarball to ${downloadPath}`
+            );
+
+            const parsedContentDisposition = (
+                await import('content-disposition-header')
+            ).parse(response.headers['content-disposition'] as string);
+
+            const fileName = parsedContentDisposition.parameters['filename'];
+            const filePath = `${downloadPath}/${fileName}`;
+
+            this.filesystemUtil.writeFileFromBuffer(
+                filePath,
+                Buffer.from(response.data as ArrayBuffer)
+            );
+
+            if (!options.extractDownload) {
+                return;
+            }
+
+            this.logger.debug(
+                `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
+                `Extracting tarball at ${downloadPath}`
+            );
+
+            if (!response.headers['content-disposition']) {
+                throw new Error('Missing required content-disposition header');
+            }
+
+            await this.tarUtil.extract(filePath, downloadPath, {});
         } catch (e) {
             this.logger.error(
                 `[${GithubUtil.CLASS_NAME}.downloadRepository]`,
-                `Cannot download ${repository.name}\n`,
+                `Cannot extract ${repository.name}\n`,
                 e
             );
 
@@ -1488,7 +1548,7 @@ export class GithubUtil {
             throw new Error(`The path ${path} was not found in tree`);
 
         if (path.length === 0) {
-            const candidates = _.filter(tree, GithubUtil.isGitTreeItem);
+            const candidates = _filter(tree, GithubUtil.isGitTreeItem);
 
             if (!candidates) {
                 throw new Error(
@@ -1514,7 +1574,7 @@ export class GithubUtil {
                 descriptor: match
             };
         } else {
-            const candidates = _.filter(
+            const candidates = _filter(
                 tree,
                 GithubUtil.isGitTreeItemWithGitTree
             );
@@ -1612,20 +1672,30 @@ export class GithubUtil {
 //     const { LoggerUtil, LogLevel } = await import('./logger.util');
 //     const { FilesystemUtil } = await import('./filesystem.util');
 //     const { ConfigUtil } = await import('./config.util');
+//     const { TarUtil } = await import('./tar.util');
 
 //     const logger = new LoggerUtil(LogLevel.DEBUG, 'test');
 
 //     const gitUtil = new GithubUtil({
 //         logger,
 //         filesystemUtil: new FilesystemUtil({ logger }),
-//         configUtil: new ConfigUtil({ logger })
+//         configUtil: new ConfigUtil({ logger }),
+//         tarUtil: new TarUtil({ logger })
 //     });
 
 //     const [repository] = await gitUtil.listRepositoriesForOrganization('c9', {
 //         onlyInclude: 'c9-upload-api'
 //     });
 
-//     await gitUtil.downloadRepository(repository);
+//     await gitUtil.downloadRepository(
+//         repository,
+//         '/home/ln0/gitops/c9/c9-upload-api',
+//         'heads/master',
+//         {
+//             extractDownload: true,
+//             overwriteExisting: true
+//         }
+//     );
 // })();
 
 // (async () => {

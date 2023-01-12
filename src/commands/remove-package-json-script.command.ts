@@ -1,9 +1,7 @@
 import { Command } from 'commander';
-import { RemovePackageJsonScriptAction } from '@actions/remove-package-json-scipt.action';
-import { GitOpsCommands } from '@root';
+import { RemovePackageJsonScriptAction } from '../actions/remove-package-json-scipt.action';
+import { GitOpsCommands } from '../index';
 import {
-    tokenFilePathOption,
-    githubTokenOption,
     logLevelOption,
     refOption,
     organizationsOption,
@@ -11,8 +9,9 @@ import {
     repositoryListOption,
     excludeRepositoriesOption,
     scriptKeyOption,
-    dryRunOption
-} from '@commands/options';
+    dryRunOption,
+    gitConfigNameOption
+} from './options';
 
 export const createCommand = (program: Command) => {
     program
@@ -25,11 +24,11 @@ export const createCommand = (program: Command) => {
 Remove a given script from the "scripts" section in "package.json" for effected repositories in the given organizations.
 
 -o ORGANIZATIONS,..., n 
+-c, --git-config-name default
 -k SCRIPT_KEY
-[   -p GITBUB_TOKEN_FILE_PATH 
-    -t GITHUB_TOKEN 
+[   
     -l ERROR|WARN|INFO|DEBUG 
-    -f GIT_REF 
+    -f, --ref GIT_REF 
     -r RegExp 
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
@@ -54,8 +53,7 @@ npx gitops remove-package-json-script
 `
         )
         .addOption(dryRunOption)
-        .addOption(tokenFilePathOption)
-        .addOption(githubTokenOption)
+        .addOption(gitConfigNameOption)
         .addOption(logLevelOption)
         .addOption(refOption)
         .addOption(organizationsOption)

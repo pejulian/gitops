@@ -1,10 +1,11 @@
 import { WriteFileOptions, realpathSync } from 'fs';
 import { relative, dirname, join } from 'path';
 import fse from 'fs-extra';
-import { LoggerUtil } from '@utils/logger.util';
 import { fileURLToPath } from 'url';
 import { globby, Options as GlobbyOptions } from 'globby';
 import os from 'os';
+
+import { LoggerUtil } from './logger.util';
 
 const __filename = fileURLToPath(import.meta.url);
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -142,7 +143,7 @@ export class FilesystemUtil {
         filePath: string,
         buffer: Buffer,
         options?: WriteFileOptions
-    ) {
+    ): void {
         try {
             fse.appendFileSync(filePath, buffer, options);
         } catch (e) {
@@ -151,7 +152,8 @@ export class FilesystemUtil {
                 `Failed to write buffer to ${filePath}\n`,
                 e
             );
-            return undefined;
+
+            throw e;
         }
     }
 

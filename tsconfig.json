@@ -1,36 +1,42 @@
 {
     "ts-node": {
         "esm": true,
-        "files": true
+        "files": true,
+        "experimentalResolver": true,
+        "experimentalReplAwait": true,
+        "emit": false,
+        "experimentalSpecifierResolution": "node"
     },
     "compilerOptions": {
         "target": "esnext",
         "module": "esnext",
         "resolveJsonModule": true,
         "moduleResolution": "node",
+        "allowSyntheticDefaultImports": true,
         "rootDir": "./",
-        "baseUrl": "./",
+        "baseUrl": ".",
         "declaration": false,
         "declarationMap": false,
         "sourceMap": false,
         "outDir": "dist",
         "removeComments": false,
         "strict": true,
-        "noImplicitAny": true,
+        "noImplicitAny": false,
         "strictNullChecks": true,
         "strictFunctionTypes": true,
         "noImplicitThis": true,
         "alwaysStrict": true,
         "typeRoots": ["./node_modules/@types", "./types"],
         "esModuleInterop": true,
-        "newLine": "lf",
-        "paths": {
-            "@root": ["src/index.ts"],
-            "@utils/*": ["src/utils/*"],
-            "@actions/*": ["src/actions/*"],
-            "@commands/*": ["src/commands/*"],
-            "@reporters/*": ["src/reporters/*"]
-        }
+        "newLine": "lf"
     },
-    "exclude": ["node_modules", "dist", "lib", ".husky", "coverage", "target"]
+    "exclude": [
+        "node_modules",
+        "dist",
+        "lib",
+        ".husky",
+        "coverage",
+        "target",
+        "__mocks__"
+    ]
 }

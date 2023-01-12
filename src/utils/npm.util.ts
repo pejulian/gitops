@@ -1,9 +1,12 @@
-import lodash from 'lodash';
-import { LoggerUtil } from '@utils/logger.util';
-import { ProcessorUtil } from '@utils/processsor.util';
-import { SemverUtil } from '@utils/semver.util';
+import { LoggerUtil } from './logger.util';
+import { ProcessorUtil } from './processsor.util';
+import { SemverUtil } from './semver.util';
 
-const { isObject, isArray, isEmpty, isString } = lodash;
+import isObject from 'lodash/isObject';
+import isArray from 'lodash/isArray';
+import isEmpty from 'lodash/isEmpty';
+import isString from 'lodash/isString';
+import find from 'lodash/find';
 
 export enum PackageTypes {
     d = 'devDependencies',
@@ -295,7 +298,7 @@ export class NpmUtil {
 
             if (sanitizedPackageVersion) {
                 if (versions.includes(sanitizedPackageVersion)) {
-                    result = lodash.find(
+                    result = find(
                         versions,
                         (version) => version === sanitizedPackageVersion
                     );

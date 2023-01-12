@@ -1,13 +1,14 @@
-import _ from 'lodash';
-import { GitOpsCommands } from '@root';
+import { GitOpsCommands } from '../index';
 import {
     GitHubRepository,
     GitTreeItem,
     GitTreeWithFileDescriptor
-} from '@utils/github.util';
-import { LoggerUtil, LogLevel } from '@utils/logger.util';
-import { InstallModes, NpmUtil, PackageTypes } from '@utils/npm.util';
-import { GenericAction } from '@actions/generic.action';
+} from '../utils/github.util';
+import { LoggerUtil, LogLevel } from '../utils/logger.util';
+import { InstallModes, NpmUtil, PackageTypes } from '../utils/npm.util';
+import { GenericAction } from './generic.action';
+import _find from 'lodash/find';
+import _remove from 'lodash/remove';
 
 export type ReinstallPackageActionOptions = GitOpsCommands['ReinstallPackage'];
 
@@ -24,9 +25,8 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
         ReinstallPackageAction.CLASS_NAME = 'ReinstallPackageAction';
 
         super({
-            githubToken: options.githubToken,
+            gitConfigName: options.gitConfigName,
             logLevel: LogLevel[options.logLevel as keyof typeof LogLevel],
-            tokenFilePath: options.tokenFilePath,
             organizations: options.organizations,
             repositoryList: options.repositoryList,
             excludeRepositories: options.excludeRepositories,
@@ -149,15 +149,16 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                 let descriptorWithTree: GitTreeWithFileDescriptor;
 
                 try {
-                    const findResults =
-                        await this.githubUtil.findTreeAndDescriptorForFilePath(
-                            repository,
-                            [
-                                NpmUtil.PACKAGE_JSON_FILE_NAME,
-                                NpmUtil.LOCKFILE_FILE_NAME
-                            ],
-                            this.ref ?? `heads/${repository.default_branch}`
-                        );
+                    const findResults = await this.useGithubUtils(
+                        this.gitConfigName
+                    ).findTreeAndDescriptorForFilePath(
+                        repository,
+                        [
+                            NpmUtil.PACKAGE_JSON_FILE_NAME,
+                            NpmUtil.LOCKFILE_FILE_NAME
+                        ],
+                        this.ref ?? `heads/${repository.default_branch}`
+                    );
 
                     if (findResults?.descriptors.length !== 2) {
                         this.logger.warn(
@@ -221,8 +222,8 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
 
                 if (!this.dryRun) {
                     // Remove any file descriptors that match
-                    _.remove(descriptorWithTree.tree.tree, (treeItem) => {
-                        const shaMatch = _.find(
+                    _remove(descriptorWithTree.tree.tree, (treeItem) => {
+                        const shaMatch = _find(
                             descriptorWithTree.descriptors,
                             (item) => item.sha === treeItem.sha
                         );
@@ -231,7 +232,9 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
                     });
 
                     try {
-                        await this.githubUtil.uploadToRepository(
+                        await this.useGithubUtils(
+                            this.gitConfigName
+                        ).uploadToRepository(
                             repoPath,
                             repository,
                             `Reinstall ${this.packageName} with version ${
@@ -305,13 +308,11 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
         const descriptorWithContents: Array<DescriptorWithContents> = [];
         try {
             for await (const descriptor of descriptors) {
-                const content = await this.githubUtil.getFileDescriptorContent(
-                    repository,
-                    descriptor,
-                    {
-                        ref: this.ref ?? `heads/${repository.default_branch}`
-                    }
-                );
+                const content = await this.useGithubUtils(
+                    this.gitConfigName
+                ).getFileDescriptorContent(repository, descriptor, {
+                    ref: this.ref ?? `heads/${repository.default_branch}`
+                });
 
                 descriptorWithContents.push({
                     content,
@@ -334,7 +335,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
         let lockfileDescriptorAndContent: DescriptorWithContents | undefined;
 
         try {
-            lockfileDescriptorAndContent = _.find(
+            lockfileDescriptorAndContent = _find(
                 descriptorWithContents,
                 (item) =>
                     item.descriptor.path?.includes(
@@ -355,7 +356,7 @@ export class ReinstallPackageAction extends GenericAction<ReinstallPackageAction
         let packageJsonDescriptorAndContent: DescriptorWithContents | undefined;
 
         try {
-            packageJsonDescriptorAndContent = _.find(
+            packageJsonDescriptorAndContent = _find(
                 descriptorWithContents,
                 (item) =>
                     item.descriptor.path?.includes(

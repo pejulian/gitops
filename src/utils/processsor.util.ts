@@ -1,5 +1,5 @@
 import { spawn, SpawnOptionsWithoutStdio } from 'child_process';
-import { LoggerUtil } from '@utils/logger.util';
+import { LoggerUtil } from './logger.util';
 
 export type ProcessorUtilOptions = Readonly<{
     logger: LoggerUtil;

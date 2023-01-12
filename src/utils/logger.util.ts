@@ -1,12 +1,11 @@
-import { MODULE_NAME, MODULE_VERSION } from '@root';
+import { MODULE_NAME, MODULE_VERSION } from '../index';
 import chalk from 'chalk';
-import lodash from 'lodash';
+import compact from 'lodash/compact';
+import isEmpty from 'lodash/isEmpty';
 import { Console } from 'console';
 import os from 'os';
 import fse from 'fs-extra';
 import { formatISO } from 'date-fns';
-
-const { compact, isEmpty } = lodash;
 
 export enum LogLevel {
     ERROR = 0,

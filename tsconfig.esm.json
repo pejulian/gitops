@@ -5,8 +5,7 @@
         "module": "es2020",
         "lib": ["es2020", "DOM"],
         "rootDir": "./src",
-        "outDir": "./dist",
-        "typeRoots": ["./node_modules/@types", "./types"]
+        "outDir": "./dist"
     },
     "include": ["src/**/*", "types/**/*.d.ts"],
     "exclude": ["*.spec.ts", "*.test.ts"]

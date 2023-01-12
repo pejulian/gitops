@@ -1,17 +1,18 @@
 import fse from 'fs-extra';
 
-export class FileStreamUtils {
+export class FilestreamUtil {
     private readonly stream: fse.WriteStream;
 
     constructor(
         filePath: string,
-        callback: (err?: Error) => void,
+        finishCallback: () => void,
+        errorCallback: (err?: Error) => void,
         options?: Parameters<typeof fse.createWriteStream>[1]
     ) {
         this.stream = fse.createWriteStream(filePath, options);
 
-        this.stream.on('finish', callback);
-        this.stream.on('error', callback);
+        this.stream.on('finish', finishCallback);
+        this.stream.on('error', errorCallback);
     }
 
     public write(content: string, encoding: BufferEncoding = 'utf8'): void {

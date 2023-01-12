@@ -1,8 +1,6 @@
 import { Command } from 'commander';
-import { GitOpsCommands } from '@root';
+import { GitOpsCommands } from '../index';
 import {
-    tokenFilePathOption,
-    githubTokenOption,
     logLevelOption,
     refOption,
     organizationsOption,
@@ -13,9 +11,10 @@ import {
     packageTypeOption,
     packageUpdateConditionOption,
     packageUpdateConstraintOption,
-    dryRunOption
-} from '@commands/options';
-import { UninstallPackageAction } from '@actions/uninstall-package.action';
+    dryRunOption,
+    gitConfigNameOption
+} from './options';
+import { UninstallPackageAction } from '../actions/uninstall-package.action';
 
 export const createCommand = (program: Command) => {
     program
@@ -29,11 +28,12 @@ Uninstalls an existing package from repositories in the given Git organizations.
 
 -o ORGANIZATIONS,..., n 
 -n PACKAGE_NAME
-[   -p GITBUB_TOKEN_FILE_PATH 
-    -t GITHUB_TOKEN 
+-c, --git-config-name default
+[   
     -l ERROR|WARN|INFO|DEBUG 
-    -f GIT_REF 
+    -f, --ref GIT_REF 
     -r RegExp 
+    -y, --package-type s|o|d
     -i RepositoryName, ..., n
     -e RepositoryName, ..., n
     --package-update-constraint SEMVER 
@@ -52,7 +52,7 @@ npx gitops uninstall-package
   --package-update-constraint "2.0.0"
   --package-update-condition gte
 
-This command will uninstall the development dependency "fancy-deploy" in the repository "fancy-login-user" in the GitHub organization named "my-org" IF the existing version of "fancy-deploy" in the scanned repository has a version that is less than or equal to "1.9.0". The operation will run with the log level of DEBUG. The operation will run on the "dev" branch of each repository scanned.The operation will use the user supplied git access token "abc123".
+This command will uninstall the development dependency "fancy-deploy" in the repository "fancy-login-user" in the GitHub organization named "my-org" IF the existing version of "fancy-deploy" in the scanned repository has a version that is less than or equal to "1.9.0". The operation will run with the log level of DEBUG. The operation will run on the "dev" branch of each repository scanned.
 
 npx gitops uninstall-package 
   -o my-org
@@ -61,7 +61,6 @@ npx gitops uninstall-package
   -n "fancy-deploy"
   -f "heads/dev"
   -y d
-  -t abc123
   --package-update-constraint "1.9.0"
   --package-update-condition lte
 
@@ -70,12 +69,11 @@ This command will uninstall the development dependency "webpack" in all reposito
 npx gitops uninstall-package
   -o my-org
   -n "webpack"
-  -t d
+  -y d
 `
         )
         .addOption(dryRunOption)
-        .addOption(tokenFilePathOption)
-        .addOption(githubTokenOption)
+        .addOption(gitConfigNameOption)
         .addOption(logLevelOption)
         .addOption(refOption)
         .addOption(organizationsOption)
