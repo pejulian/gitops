@@ -4,7 +4,7 @@ Swiss army knife for running DevOps like tasks on NPM based repositories in your
 
 <!-- TOC -->
 
--   [gitops](#gitops)
+-   [@pejulian/gitops](#@pejulian/gitops)
     -   [Is this module for me?](#is-this-module-for-me)
     -   [Installation](#installation)
     -   [Setup](#setup)
@@ -28,33 +28,33 @@ Swiss army knife for running DevOps like tasks on NPM based repositories in your
 
 ## Is this module for me?
 
-If you have many projects based on NodeJS (e.g. the project root has a `package.json`), then this project may be helpful for you.
+If you have many projects based on NodeJS (e.g. the project root has a `package.json`) in your Git organization, then this project may be helpful for you if you need to run updates on them at scale.
 
 ## Installation
 
-Run `gitops` via `npx` (recommended):
+Run `@pejulian/gitops` via `npx` (preferred):
 
 ```bash
-npx gitops
+npx @pejulian/gitops
 ```
 
 or with a specified version or tag:
 
 ```bash
-npx gitops@0.1.0
+npx @pejulian/gitops@0.1.0
 # or
-npx gitops@beta
+npx @pejulian/gitops@beta
 ```
 
-Install `gitops` globally on your machine:
+Install `@pejulian/gitops` globally on your machine:
 
 ```bash
-npm install -g gitops
+npm install -g @pejulian/gitops
 ```
 
 ## Setup
 
-`gitops` interacts with your Git organizations and repositories using Git's REST API In order to use the API, a Personal Access Token is required for authentication purposes. This token will be included in every request to Git via REST API headers.
+`@pejulian/gitops` interacts with your Git organizations and repositories using Git's REST API In order to use the API, a Personal Access Token is required for authentication purposes. This token will be included in every request to Git via REST API headers.
 
 For instructions on how to set up a Personal Access Token (PAT) for your Git user, read [this](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token).
 
@@ -101,7 +101,7 @@ For example:
 
 ## Commands
 
-Run `npx gitops --help` to view the commands supported by this tool.
+Run `npx @pejulian/gitops --help` to view the commands supported by this tool.
 
 ### `add-package-json-script`
 
@@ -110,7 +110,7 @@ This command allows you to add a script to the "scripts" section in "package.jso
 Run:
 
 ```bash
-npx gitops add-package-json-script --help
+npx @pejulian/gitops add-package-json-script --help
 ```
 
 for more information.
@@ -122,7 +122,7 @@ Downloads repositories (as tarball) for the given organizations. Optionally, ext
 Run:
 
 ```bash
-npx gitops download-repository --help
+npx @pejulian/gitops download-repository --help
 ```
 
 for more information.
@@ -134,7 +134,7 @@ This command allows you to find and replace matches of the supplied regex for a 
 Run:
 
 ```bash
-npx gitops find-and-replace --help
+npx @pejulian/gitops find-and-replace --help
 ```
 
 for more information.
@@ -146,7 +146,7 @@ This command allows you to install a new package in the effected repositories fo
 Run:
 
 ```bash
-npx gitops install-package --help
+npx @pejulian/gitops install-package --help
 ```
 
 for more information.
@@ -158,7 +158,7 @@ Reinstall an existing package in the effected repositories for the given organiz
 Run:
 
 ```bash
-npx gitops reinstall-package --help
+npx @pejulian/gitops reinstall-package --help
 ```
 
 for more information.
@@ -170,7 +170,7 @@ Remove a given script from the "scripts" section in "package.json" for effected 
 Run:
 
 ```bash
-npx gitops remove-package --help
+npx @pejulian/gitops remove-package --help
 ```
 
 for more information.
@@ -182,7 +182,7 @@ This command allows you to rename a file across multiple git organizations and r
 Run:
 
 ```bash
-npx gitops rename-file --help
+npx @pejulian/gitops rename-file --help
 ```
 
 for more information.
@@ -194,7 +194,7 @@ This command allows you to remove a given script from the "scripts" section in "
 Run:
 
 ```bash
-npx gitops remove-package-json-script --help
+npx @pejulian/gitops remove-package-json-script --help
 ```
 
 for more information.
@@ -206,7 +206,7 @@ This command allows you to update the version of an existing npm package in `pac
 Run:
 
 ```bash
-npx gitops update-package-version --help
+npx @pejulian/gitops update-package-version --help
 ```
 
 for more information.
@@ -218,51 +218,7 @@ This command allows you to uninstall an existing package from repositories in th
 Run:
 
 ```bash
-npx gitops uninstall-package --help
+npx @pejulian/gitops uninstall-package --help
 ```
 
 for more information.
-
-## Development
-
-If you cloned this repo and need to test the code locally without publishing to npm, use the following:
-
-```bash
-npm run local -- [COMMAND] [FLAGS]
-```
-
-_Example to rename all instances of "/etc/my-conf" to "their-conf" in all repositories in the organization foo where repository names start with the prefix bar_:
-
-```bash
-npm run local -- rename-file \
-  -o foo \
-  -r "^bar_" \
-  --target-file-path /etc/my-conf \
-  --new-file-name their-conf
-```
-
-_Example to rename the file "./src/v1/utils/crypto.utils.ts" to "encryption.utils.ts" in the "login-user" repository in the organization "authy" on the "heads/main" (main branch) reference while logging all actions in DEBUG mode_:
-
-```bash
-npm run local -- rename-file \
-  -o authy \
-  -l DEBUG \
-  -r "login-user" \
-  --target-file-path ./src/v1/utils/crypto.utils.ts \
-  --new-file-name encryption.utils.ts \
-  -f heads/main
-```
-
-_Example to update the devDependency npm package version of "fancy-deploy" to "beta" in the the "login-user" repository in the organization "fancy" while logging all actions in DEBUG mode_
-
-```bash
-npm run local -- update-package-version \
-  -o fancy \
-  -l DEBUG \
-  -r "login-user" \
-  --package-name fancy-deploy \
-  --package-version beta \
-  --package-type d \
-```
-
-> Remove -r if you would like to apply the action across all repositories in this organization
