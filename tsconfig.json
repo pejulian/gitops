@@ -1,11 +1,7 @@
 {
     "ts-node": {
-        "esm": true,
         "files": true,
-        "experimentalResolver": true,
-        "experimentalReplAwait": true,
-        "emit": false,
-        "experimentalSpecifierResolution": "node"
+        "esm": true
     },
     "compilerOptions": {
         "target": "esnext",
@@ -15,9 +11,9 @@
         "allowSyntheticDefaultImports": true,
         "rootDir": "./",
         "baseUrl": ".",
-        "declaration": false,
-        "declarationMap": false,
-        "sourceMap": false,
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
         "outDir": "dist",
         "removeComments": false,
         "strict": true,
@@ -35,6 +31,7 @@
         "dist",
         "lib",
         ".husky",
+        ".vscode",
         "coverage",
         "target",
         "__mocks__"

@@ -41,7 +41,7 @@ npx gitops
 or with a specified version or tag:
 
 ```bash
-npx gitops@0.0.32
+npx gitops@0.1.0
 # or
 npx gitops@beta
 ```

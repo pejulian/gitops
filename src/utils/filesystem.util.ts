@@ -79,7 +79,7 @@ export class FilesystemUtil {
     public async writeJsonFile(
         filePath: string,
         content: unknown,
-        options?: string | fse.WriteOptions
+        options?: string | fse.JsonWriteOptions
     ): Promise<void> {
         try {
             await fse.writeJson(filePath, content, options);
@@ -206,7 +206,7 @@ export class FilesystemUtil {
     public getRootDir(): string {
         const filePath = dirname(realpathSync(__filename));
         let rootDir: string;
-        if (process.env.WEBPACK_BUILD) {
+        if (process.env.ESBUILD_PACKAGE) {
             rootDir = join(filePath, './');
         } else {
             rootDir = join(

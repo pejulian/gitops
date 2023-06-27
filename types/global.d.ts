@@ -13,9 +13,9 @@ declare namespace NodeJS {
          */
         readonly MODULE_DESCRIPTION: string;
         /**
-         * Determines if the code is executed from a webpack build
+         * Determines if the code is executed from an esbuild bundle
          */
-        readonly WEBPACK_BUILD: string;
+        readonly ESBUILD_PACKAGE: string;
     }
 }
 

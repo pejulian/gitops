@@ -189,7 +189,7 @@ export class GithubUtil {
 
         try {
             for await (const response of this.octokit.paginate.iterator(
-                this.octokit.rest.repos.listForOrg,
+                'GET /orgs/{org}/repos',
                 {
                     org: organization,
                     type: 'all'
@@ -443,7 +443,8 @@ export class GithubUtil {
             const tags: Array<string> = [];
 
             for await (const response of this.octokit.paginate.iterator(
-                this.octokit.rest.repos.listReleases,
+                // this.octokit.rest.repos.listReleases,
+                'GET /repos/{owner}/{repo}/releases',
                 {
                     owner: repository.owner.login,
                     repo: repository.name,

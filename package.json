@@ -4,18 +4,22 @@
     "type": "module",
     "author": "Julian Pereira",
     "license": "ISC",
-    "version": "0.0.37-beta.5",
+    "version": "0.1.0",
     "engines": {
-        "node": ">=16",
-        "npm": ">=8"
+        "node": ">=18",
+        "npm": ">=9.4.x"
     },
     "bin": {
         "gitops": "./dist/index.js"
     },
     "exports": {
         ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
+            "import": "./dist/esm/index.js",
+            "require": "./dist/cjs/index.cjs"
+        },
+        "./*": {
+            "import": "./dist/esm/*.js",
+            "require": "./dist/cjs/*.cjs"
         }
     },
     "files": [
@@ -27,11 +31,12 @@
         "git",
         "octokit",
         "devops",
-        "sysadmin"
+        "sysadmin",
+        "npm"
     ],
     "scripts": {
-        "build": "node --max-old-space-size=4096 --no-warnings --experimental-specifier-resolution=node --experimental-modules --loader ts-node/esm ./node_modules/.bin/webpack-cli --config ./webpack.config.ts",
-        "local": "npx ts-node --project ./tsconfig.esm.json src/index.ts",
+        "build": "npm run clean && npx ts-node ./build.ts && npm run build:esm:types",
+        "build:esm:types": "tsc -p ./tsconfig.esm.json --emitDeclarationOnly",
         "prepublishOnly": "npm run build",
         "test": "jest --config ./jest.config.json --runInBand --no-cache",
         "test:watch": "jest --config ./jest.config.json --watch",
@@ -39,6 +44,7 @@
         "prettier:format": "prettier --write ./src/**/*.ts",
         "prettier:check": "prettier --list-different ./src/**/*.ts",
         "lint": "eslint --fix",
+        "clean": "rimraf -- dist",
         "prepare": "husky install",
         "publish:latest": "npm publish --tag latest",
         "publish:beta": "npm publish --tag beta",
@@ -54,59 +60,55 @@
     },
     "repository": {
         "type": "git",
-        "url": "git@github.topdanmark.local:ln0/gitops.git"
+        "url": "git@github.com:pejulian/gitops.git"
     },
     "bugs": {
-        "url": "https://github.topdanmark.local/ln0/gitops/issues"
-    },
-    "publishConfig": {
-        "registry": "http://artifactory.topdanmark.local/artifactory/api/npm/npm-local/"
+        "url": "https://github.com/pejulian/gitops/issues"
     },
     "devDependencies": {
         "@types/fs-extra": "^11.0.1",
         "@types/gunzip-maybe": "^1.4.0",
-        "@types/jest": "^29.2.5",
-        "@types/lodash": "^4.14.191",
-        "@types/node": "^18.11.18",
-        "@types/prompt": "^1.1.4",
-        "@types/semver": "^7.3.13",
-        "@types/tar": "^6.1.3",
+        "@types/jest": "^29.5.2",
+        "@types/lodash": "^4.14.195",
+        "@types/node": "^20.3.2",
+        "@types/prompt": "^1.1.5",
+        "@types/semver": "^7.5.0",
+        "@types/tar": "^6.1.5",
         "@types/tar-fs": "^2.0.1",
-        "@typescript-eslint/eslint-plugin": "^5.48.1",
-        "@typescript-eslint/parser": "^5.48.1",
-        "eslint": "^8.31.0",
-        "eslint-config-prettier": "^8.6.0",
+        "@typescript-eslint/eslint-plugin": "^5.60.1",
+        "@typescript-eslint/parser": "^5.60.1",
+        "esbuild": "^0.18.10",
+        "esbuild-node-externals": "^1.8.0",
+        "eslint": "^8.43.0",
+        "eslint-config-prettier": "^8.8.0",
         "eslint-plugin-prettier": "^4.2.1",
         "husky": "^8.0.3",
-        "jest": "^29.3.1",
-        "jest-mock": "^29.3.1",
-        "lint-staged": "^13.1.0",
-        "prettier": "^2.8.2",
-        "terser-webpack-plugin": "^5.3.6",
-        "ts-jest": "^29.0.4",
-        "ts-loader": "^9.4.2",
+        "jest": "^29.5.0",
+        "jest-mock": "^29.5.0",
+        "lint-staged": "^13.2.2",
+        "prettier": "^2.8.8",
+        "rimraf": "^5.0.1",
+        "ts-jest": "^29.1.0",
+        "ts-loader": "^9.4.3",
         "ts-node": "^10.9.1",
-        "tsconfig-paths": "^4.1.2",
-        "tsconfig-paths-webpack-plugin": "^4.0.0",
-        "typescript": "^4.9.4",
-        "webpack": "^5.75.0",
-        "webpack-cli": "^5.0.1"
+        "tsconfig-paths": "^4.2.0",
+        "typescript": "^5.1.3"
     },
     "dependencies": {
-        "@octokit/rest": "^19.0.5",
+        "@octokit/rest": "^19.0.13",
         "chalk": "^5.2.0",
-        "commander": "^9.5.0",
+        "commander": "^11.0.0",
         "console-table-printer": "^2.11.1",
         "content-disposition-header": "^0.6.0",
-        "date-fns": "^2.29.3",
-        "dotenv": "^16.0.3",
-        "figlet": "^1.5.2",
-        "fs-extra": "^11.1.0",
-        "globby": "^13.1.3",
+        "date-fns": "^2.30.0",
+        "dotenv": "^16.3.1",
+        "figlet": "^1.6.0",
+        "fs-extra": "^11.1.1",
+        "globby": "^13.2.0",
         "gunzip-maybe": "^1.4.2",
         "lodash": "^4.17.21",
         "prompt": "^1.3.0",
-        "semver": "^7.3.8",
-        "tar-fs": "^2.1.1"
+        "semver": "^7.5.3",
+        "tar-fs": "^3.0.3"
     }
 }
