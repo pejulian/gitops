@@ -1,16 +1,16 @@
 {
-    "name": "gitops",
+    "name": "@pejulian/gitops",
     "description": "Swiss army knife for running DevOps like tasks on NPM based repositories in your Git organization",
     "type": "module",
     "author": "Julian Pereira",
     "license": "ISC",
-    "version": "0.1.0",
+    "version": "0.1.0-beta.2",
     "engines": {
         "node": ">=18",
-        "npm": ">=9.4.x"
+        "npm": ">=9.2.x"
     },
     "bin": {
-        "gitops": "./dist/index.js"
+        "@pejulian/gitops": "./dist/index.js"
     },
     "exports": {
         ".": {
@@ -44,8 +44,8 @@
         "lint": "eslint --fix",
         "clean": "rimraf -- dist",
         "prepare": "husky install",
-        "publish:latest": "npm publish --tag latest",
-        "publish:beta": "npm publish --tag beta",
+        "publish:latest": "npm publish --tag latest --access=public",
+        "publish:beta": "npm publish --tag beta --access=public",
         "versions:list": "npm view gitops --json"
     },
     "repository": {

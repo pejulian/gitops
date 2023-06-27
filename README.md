@@ -1,4 +1,4 @@
-# gitops
+# @pejulian/gitops
 
 Swiss army knife for running DevOps like tasks on NPM based repositories in your Git organization.
 

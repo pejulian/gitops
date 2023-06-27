@@ -24,7 +24,7 @@ const commonArgs: BuildOptions = {
     ],
     banner: {
         js: [
-            `#!/usr/bin/env node`,
+            '#!/usr/bin/env node',
             `/* ${packageJson.name} - ${new Date().toLocaleDateString()} */`
         ].join('\n')
     },
@@ -49,7 +49,7 @@ const esmBuild = esbuild.build({
     },
     banner: {
         js: [
-            ...(commonArgs.banner?.js ?? []),
+            commonArgs.banner?.js ?? '',
             `import { createRequire } from 'module';`,
             'const require = createRequire(import.meta.url);'
         ].join('\n')
